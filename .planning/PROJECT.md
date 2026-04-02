@@ -28,6 +28,10 @@ After any canvas action, Opus reads spatial context and generates relevant multi
 - [ ] Opus decides which medium type(s) to generate based on context
 - [ ] Streaming/progressive rendering so content appears quickly
 - [ ] Works for a small team (shared configuration, API key management)
+- [ ] Global taste profile that defines what the user considers tasteful and how they think
+- [ ] Taste profile is editable (settings UI or markdown file)
+- [ ] Opus uses the taste profile to shape all generated content — tone, style, depth, aesthetics
+- [ ] Each team member can have their own taste profile
 
 ### Out of Scope
 
@@ -63,6 +67,7 @@ After any canvas action, Opus reads spatial context and generates relevant multi
 | Generate new nodes only (don't modify existing) | Simpler v1, preserves user's original content | -- Pending |
 | Opus decides medium type based on context | More natural than forcing user to specify output type | -- Pending |
 | Proximity = relationship + focus signal | Richer spatial interpretation enables better generation | -- Pending |
+| Taste profile shapes all generation | Users think differently — generated content should reflect the user's sensibility, not generic AI output | -- Pending |
 
 ## Evolution
 

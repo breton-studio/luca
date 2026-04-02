@@ -110,64 +110,64 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUN-01 | - | Pending |
-| FOUN-02 | - | Pending |
-| FOUN-03 | - | Pending |
-| FOUN-04 | - | Pending |
-| FOUN-05 | - | Pending |
-| FOUN-06 | - | Pending |
-| FOUN-07 | - | Pending |
-| FOUN-08 | - | Pending |
-| FOUN-09 | - | Pending |
-| FOUN-10 | - | Pending |
-| FOUN-11 | - | Pending |
-| FOUN-12 | - | Pending |
-| FOUN-13 | - | Pending |
-| SPAT-01 | - | Pending |
-| SPAT-02 | - | Pending |
-| SPAT-03 | - | Pending |
-| SPAT-04 | - | Pending |
-| SPAT-05 | - | Pending |
-| SPAT-06 | - | Pending |
-| SPAT-07 | - | Pending |
-| SPAT-08 | - | Pending |
-| SPAT-09 | - | Pending |
-| SPAT-10 | - | Pending |
-| GENP-01 | - | Pending |
-| GENP-02 | - | Pending |
-| GENP-03 | - | Pending |
-| GENP-04 | - | Pending |
-| GENP-05 | - | Pending |
-| GENP-06 | - | Pending |
-| GENP-07 | - | Pending |
-| GENP-08 | - | Pending |
-| GENP-09 | - | Pending |
-| GENP-10 | - | Pending |
-| GENP-11 | - | Pending |
-| GENP-12 | - | Pending |
-| MMED-01 | - | Pending |
-| MMED-02 | - | Pending |
-| MMED-03 | - | Pending |
-| MMED-04 | - | Pending |
-| MMED-05 | - | Pending |
-| MMED-06 | - | Pending |
-| MMED-07 | - | Pending |
-| MMED-08 | - | Pending |
-| MMED-09 | - | Pending |
-| MMED-10 | - | Pending |
-| TAST-01 | - | Pending |
-| TAST-02 | - | Pending |
-| TAST-03 | - | Pending |
-| TAST-04 | - | Pending |
-| TAST-05 | - | Pending |
-| TAST-06 | - | Pending |
-| TAST-07 | - | Pending |
+| FOUN-01 | Phase 1 | Pending |
+| FOUN-02 | Phase 1 | Pending |
+| FOUN-03 | Phase 1 | Pending |
+| FOUN-04 | Phase 1 | Pending |
+| FOUN-05 | Phase 1 | Pending |
+| FOUN-06 | Phase 1 | Pending |
+| FOUN-07 | Phase 1 | Pending |
+| FOUN-08 | Phase 1 | Pending |
+| FOUN-09 | Phase 1 | Pending |
+| FOUN-10 | Phase 1 | Pending |
+| FOUN-11 | Phase 1 | Pending |
+| FOUN-12 | Phase 1 | Pending |
+| FOUN-13 | Phase 1 | Pending |
+| SPAT-01 | Phase 2 | Pending |
+| SPAT-02 | Phase 2 | Pending |
+| SPAT-03 | Phase 2 | Pending |
+| SPAT-04 | Phase 2 | Pending |
+| SPAT-05 | Phase 2 | Pending |
+| SPAT-06 | Phase 2 | Pending |
+| SPAT-07 | Phase 2 | Pending |
+| SPAT-08 | Phase 2 | Pending |
+| SPAT-09 | Phase 2 | Pending |
+| SPAT-10 | Phase 2 | Pending |
+| GENP-01 | Phase 3 | Pending |
+| GENP-02 | Phase 3 | Pending |
+| GENP-03 | Phase 3 | Pending |
+| GENP-04 | Phase 3 | Pending |
+| GENP-05 | Phase 3 | Pending |
+| GENP-06 | Phase 3 | Pending |
+| GENP-07 | Phase 3 | Pending |
+| GENP-08 | Phase 3 | Pending |
+| GENP-09 | Phase 3 | Pending |
+| GENP-10 | Phase 3 | Pending |
+| GENP-11 | Phase 3 | Pending |
+| GENP-12 | Phase 3 | Pending |
+| MMED-01 | Phase 3 | Pending |
+| MMED-02 | Phase 4 | Pending |
+| MMED-03 | Phase 4 | Pending |
+| MMED-04 | Phase 4 | Pending |
+| MMED-05 | Phase 4 | Pending |
+| MMED-06 | Phase 4 | Pending |
+| MMED-07 | Phase 4 | Pending |
+| MMED-08 | Phase 4 | Pending |
+| MMED-09 | Phase 3 | Pending |
+| MMED-10 | Phase 3 | Pending |
+| TAST-01 | Phase 3 | Pending |
+| TAST-02 | Phase 3 | Pending |
+| TAST-03 | Phase 3 | Pending |
+| TAST-04 | Phase 5 | Pending |
+| TAST-05 | Phase 5 | Pending |
+| TAST-06 | Phase 5 | Pending |
+| TAST-07 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 47 total
-- Mapped to phases: 0
-- Unmapped: 47
+- v1 requirements: 52 total
+- Mapped to phases: 52
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-02*
-*Last updated: 2026-04-02 after initial definition*
+*Last updated: 2026-04-02 after roadmap creation*

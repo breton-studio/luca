@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-04-03T16:11:03.892Z"
+stopped_at: Completed 03-04-PLAN.md
+last_updated: "2026-04-03T16:17:27.916Z"
 last_activity: 2026-04-03
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 14
-  completed_plans: 12
+  completed_plans: 13
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 03 (core-generation-loop) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-04-03
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03 P01 | 5min | 3 tasks | 7 files |
 | Phase 03 P03 | 4min | 4 tasks | 5 files |
 | Phase 03 P02 | 4min | 3 tasks | 7 files |
+| Phase 03 P04 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -108,6 +109,10 @@ Recent decisions affecting current work:
 - [Phase 03]: 2-block system prompt: block 1 (instructions+taste) cached with ephemeral, block 2 (spatial narrative) dynamic
 - [Phase 03]: Tag-aware stream accumulation via extractCurrentNodeVisibleText parses raw text by node index for clean visible text
 - [Phase 03]: Buffer flush via setTimeout on each delta, not setInterval -- naturally throttles without lingering timers
+- [Phase 03]: Mutable activeNode closure variable for D-03 sequential streaming -- redirect onTextUpdate to new canvas nodes mid-stream
+- [Phase 03]: 3-node cap enforced in onNodeBoundary (nextIndex < 3) per D-02 with fallback placement
+- [Phase 03]: Auto-recover from error state to idle after 5 seconds to prevent stuck error display
+- [Phase 03]: Token usage persisted by merging with settings data via loadData/saveData, loaded on startup with date-based reset
 
 ### Pending Todos
 
@@ -120,6 +125,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-03T16:11:03.889Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-04-03T16:17:27.913Z
+Stopped at: Completed 03-04-PLAN.md
 Resume file: None

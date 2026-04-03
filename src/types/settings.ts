@@ -14,6 +14,9 @@ export interface CanvasAISettings {
 
   // Phase 3: Taste profile (D-09)
   tasteProfilePath: string;
+
+  // Phase 4: Image save location (D-07)
+  imageSavePath: string;
 }
 
 export const DEFAULT_SETTINGS: CanvasAISettings = {
@@ -25,6 +28,7 @@ export const DEFAULT_SETTINGS: CanvasAISettings = {
   dailyTokenBudget: 500000,
   aiNodeColor: '6',
   tasteProfilePath: '.obsidian/plugins/canvas-ai/taste-profile.md',
+  imageSavePath: 'canvas-ai-images',
 };
 
 export interface TokenUsageData {

@@ -47,3 +47,13 @@
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent) 40%, transparent);
   }
 }
+
+/* Phase 4: Image placeholder text centering and styling */
+.canvas-ai-node--image-placeholder .markdown-rendered {
+  color: var(--text-muted);
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}

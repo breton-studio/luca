@@ -180,6 +180,22 @@ export class CanvasAISettingTab extends PluginSettingTab {
             await (this.plugin as any).resetTasteProfile();
           })
       );
+
+    // --- Image Generation Section (Phase 4, D-07) ---
+    containerEl.createEl('h3', { text: 'Image Generation' });
+
+    new Setting(containerEl)
+      .setName('Image save location')
+      .setDesc('Vault folder where generated images are saved')
+      .addText((text) =>
+        text
+          .setPlaceholder('canvas-ai-images')
+          .setValue(this.plugin.settings.imageSavePath)
+          .onChange(async (value) => {
+            this.plugin.settings.imageSavePath = value || 'canvas-ai-images';
+            await this.plugin.saveSettings();
+          })
+      );
   }
 
   // D-06: Format-only validation per user approval.

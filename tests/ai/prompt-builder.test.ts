@@ -49,13 +49,32 @@ describe('prompt-builder', () => {
   });
 
   describe('GENERATION_INSTRUCTIONS', () => {
-    test('contains "<node>" delimiter instruction for multi-node output', () => {
-      expect(GENERATION_INSTRUCTIONS).toContain('<node>');
-      expect(GENERATION_INSTRUCTIONS).toContain('</node>');
+    test('contains typed <node type="text"> tag instruction', () => {
+      expect(GENERATION_INSTRUCTIONS).toContain('<node type="text">');
     });
 
-    test('contains "1-3 text nodes" instruction', () => {
-      expect(GENERATION_INSTRUCTIONS).toContain('1-3 text nodes');
+    test('contains typed <node type="code" lang="typescript"> tag instruction', () => {
+      expect(GENERATION_INSTRUCTIONS).toContain('<node type="code" lang="typescript">');
+    });
+
+    test('contains typed <node type="mermaid"> tag instruction', () => {
+      expect(GENERATION_INSTRUCTIONS).toContain('<node type="mermaid">');
+    });
+
+    test('contains typed <node type="image"> tag instruction', () => {
+      expect(GENERATION_INSTRUCTIONS).toContain('<node type="image">');
+    });
+
+    test('contains "AT MOST one node of each type" constraint', () => {
+      expect(GENERATION_INSTRUCTIONS).toContain('AT MOST one node of each type');
+    });
+
+    test('does NOT contain old text-only instruction', () => {
+      expect(GENERATION_INSTRUCTIONS).not.toContain('For now, generate text/markdown nodes only');
+    });
+
+    test('contains </node> closing tag', () => {
+      expect(GENERATION_INSTRUCTIONS).toContain('</node>');
     });
   });
 
@@ -64,7 +83,11 @@ describe('prompt-builder', () => {
       const message = buildUserMessage();
       expect(typeof message).toBe('string');
       expect(message.length).toBeGreaterThan(0);
-      expect(message).toContain('<node>');
+    });
+
+    test('references typed <node> tags', () => {
+      const message = buildUserMessage();
+      expect(message).toContain('typed <node> tags');
     });
   });
 });

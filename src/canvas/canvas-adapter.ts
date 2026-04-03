@@ -274,10 +274,18 @@ export class CanvasAdapter {
     color?: string
   ): any | null {
     try {
+      // Resolve path to TFile — createFileNode expects a TFile, not a string
+      // (Obsidian calls file.getShortName() during render)
+      const file = this.app.vault.getAbstractFileByPath(filePath);
+      if (!file) {
+        console.error('CanvasAdapter: file not found in vault:', filePath);
+        return null;
+      }
+
       const node = canvas.createFileNode({
         pos: { x: position.x, y: position.y },
         size: { width: position.width, height: position.height },
-        file: filePath,
+        file: file,
         focus: false,
       });
 

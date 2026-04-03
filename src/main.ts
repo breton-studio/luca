@@ -202,6 +202,12 @@ export default class CanvasAIPlugin extends Plugin {
     return nodes.map(n => `${n.id}:${n.x},${n.y}:${n.content}`).sort().join('|');
   }
 
+  /** Re-snapshot canvas hash after async mutations (image gen) to prevent re-trigger */
+  private resnapCanvasHash(canvas: any): void {
+    const nodes = this.adapter.getNodesFromCanvas(canvas);
+    if (nodes.length > 0) this.lastCanvasHash = this.computeCanvasHash(nodes);
+  }
+
   // ─── Generation Pipeline (GENP-01 through GENP-12) ───────────────
 
   /**
@@ -502,6 +508,7 @@ export default class CanvasAIPlugin extends Plugin {
       this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--streaming');
       this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--image-placeholder');
       this.suppressEvents(() => this.adapter.updateNodeText(placeholderNode, 'Image generation failed'));
+      this.resnapCanvasHash(canvas);
       new Notice('Canvas AI: Image generation failed. Check your Runware API key in Settings.');
       return;
     }
@@ -517,6 +524,7 @@ export default class CanvasAIPlugin extends Plugin {
         this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--streaming');
         this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--image-placeholder');
         this.suppressEvents(() => this.adapter.updateNodeText(placeholderNode, 'Image generation failed'));
+        this.resnapCanvasHash(canvas);
         new Notice('Canvas AI: Image generation failed. Check your Runware API key in Settings.');
         return;
       }
@@ -553,11 +561,16 @@ export default class CanvasAIPlugin extends Plugin {
 
       this.adapter.requestCanvasSave(canvas);
 
+      // Re-snapshot canvas hash so the file node swap isn't seen as a user change
+      const postNodes = this.adapter.getNodesFromCanvas(canvas);
+      if (postNodes.length > 0) this.lastCanvasHash = this.computeCanvasHash(postNodes);
+
     } catch (err) {
       console.error('[Canvas AI] Image generation failed:', err);
       this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--streaming');
       this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--image-placeholder');
       this.suppressEvents(() => this.adapter.updateNodeText(placeholderNode, 'Image generation failed'));
+      this.resnapCanvasHash(canvas);
 
       // Determine error type for appropriate notice
       const errMsg = err instanceof Error ? err.message : 'Unknown error';

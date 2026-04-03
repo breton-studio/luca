@@ -13,11 +13,15 @@ export interface CanvasNodeInfo {
   color?: string;
 }
 
+// Re-export spatial edge type for convenience
+export type { CanvasEdgeInfo } from '../spatial/types';
+
 /**
  * Normalized canvas data (nodes + edges).
  * Used by file-based fallback and spatial analysis (Phase 2).
  */
 export interface CanvasSnapshot {
   nodes: CanvasNodeInfo[];
+  edges: CanvasEdgeInfo[];
   filePath: string;
 }

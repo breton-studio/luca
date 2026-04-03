@@ -1,7 +1,8 @@
 import type { App, TFile, WorkspaceLeaf } from 'obsidian';
 import type { CanvasView } from 'obsidian-typings';
 import type { CanvasData, AllCanvasNodeData } from 'obsidian/canvas';
-import type { CanvasNodeInfo, CanvasSnapshot } from '../types/canvas';
+import type { CanvasNodeInfo, CanvasSnapshot, CanvasEdgeInfo } from '../types/canvas';
+import type { ViewportState } from '../spatial/types';
 
 /**
  * Canvas Adapter Layer (FOUN-02).
@@ -89,6 +90,51 @@ export class CanvasAdapter {
   }
 
   /**
+   * Read all edges from the active canvas via internal API.
+   * Returns normalized CanvasEdgeInfo[] for spatial analysis.
+   * Follows the same defensive pattern as getNodesFromCanvas (Pitfall 5).
+   */
+  getEdgesFromCanvas(canvas: any): CanvasEdgeInfo[] {
+    try {
+      const edges: CanvasEdgeInfo[] = [];
+      // canvas.edges is a Map<string, CanvasEdge> (similar to canvas.nodes)
+      if (canvas.edges && typeof canvas.edges.values === 'function') {
+        for (const edge of canvas.edges.values()) {
+          const fromNode = edge.from?.node?.id ?? '';
+          const toNode = edge.to?.node?.id ?? '';
+          // Filter out edges with missing endpoint references
+          if (fromNode === '' || toNode === '') continue;
+          edges.push({
+            id: edge.id ?? '',
+            fromNode,
+            toNode,
+            label: edge.label ?? undefined,
+          });
+        }
+      }
+      return edges;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Read viewport state (pan and zoom) from the active canvas.
+   * Returns null if viewport data is unavailable.
+   */
+  getViewportState(canvas: any): ViewportState | null {
+    try {
+      return {
+        x: canvas.x ?? 0,
+        y: canvas.y ?? 0,
+        zoom: canvas.zoom ?? 1,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * FALLBACK (FOUN-03): Read canvas data from file when internal API is unavailable.
    * Used when: canvas view is not active, internal API breaks, or batch reading.
    */
@@ -99,7 +145,13 @@ export class CanvasAdapter {
       const nodes = (data.nodes || []).map((nodeData: AllCanvasNodeData) =>
         this.normalizeNodeData(nodeData)
       );
-      return { nodes, filePath: file.path };
+      const edges: CanvasEdgeInfo[] = (data.edges || []).map((e) => ({
+        id: e.id,
+        fromNode: e.fromNode,
+        toNode: e.toNode,
+        label: e.label ?? undefined,
+      }));
+      return { nodes, edges, filePath: file.path };
     } catch {
       return null;
     }

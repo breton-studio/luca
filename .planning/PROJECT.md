@@ -12,19 +12,18 @@ After any canvas action, Opus reads spatial context and generates relevant multi
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] Opus receives spatial context: node positions, content, and proximity relationships — Validated in Phase 02: spatial-intelligence
+- [x] Proximity interpreted as both "related concepts" and "focus area" — Validated in Phase 02: spatial-intelligence
+- [x] Generated nodes appear with spatial awareness (placed logically, not overlapping) — Validated in Phase 02: spatial-intelligence
 
 ### Active
 
 - [ ] Plugin hooks into Obsidian canvas events (node create, move, edit, delete)
 - [ ] Debounce triggers Opus after ~3s of user idle
-- [ ] Opus receives spatial context: node positions, content, and proximity relationships
-- [ ] Proximity interpreted as both "related concepts" and "focus area"
 - [ ] Auto-generates new text/markdown nodes placed near the action area
 - [ ] Auto-generates code block nodes when context calls for it
 - [ ] Auto-generates SVG/Mermaid diagram nodes for structured visuals
 - [ ] Auto-generates images via Riverflow 2.0 Pro (Runware API) when visuals are needed
-- [ ] Generated nodes appear with spatial awareness (placed logically, not overlapping)
 - [ ] Opus decides which medium type(s) to generate based on context
 - [ ] Streaming/progressive rendering so content appears quickly
 - [ ] Works for a small team (shared configuration, API key management)
@@ -87,4 +86,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-02 after initialization*
+*Last updated: 2026-04-03 after Phase 02 completion*

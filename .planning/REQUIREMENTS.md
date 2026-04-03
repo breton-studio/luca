@@ -52,9 +52,9 @@
 ### Multi-Medium Output
 
 - [x] **MMED-01**: Text/markdown nodes generated with properly formatted content
-- [ ] **MMED-02**: Code block nodes generated with language-tagged fenced code blocks
-- [ ] **MMED-03**: Mermaid diagram nodes generated using Obsidian's built-in Mermaid renderer
-- [ ] **MMED-04**: Mermaid rendering buffered until diagram is complete (no mid-stream render)
+- [x] **MMED-02**: Code block nodes generated with language-tagged fenced code blocks
+- [x] **MMED-03**: Mermaid diagram nodes generated using Obsidian's built-in Mermaid renderer
+- [x] **MMED-04**: Mermaid rendering buffered until diagram is complete (no mid-stream render)
 - [x] **MMED-05**: Image generation triggered via Runware API with Riverflow 2.0 Pro model
 - [x] **MMED-06**: Opus generates image prompts, Runware renders the image
 - [x] **MMED-07**: Generated images saved to vault and displayed as file nodes on canvas
@@ -146,9 +146,9 @@
 | GENP-11 | Phase 3 | Complete |
 | GENP-12 | Phase 3 | Complete |
 | MMED-01 | Phase 3 | Complete |
-| MMED-02 | Phase 4 | Pending |
-| MMED-03 | Phase 4 | Pending |
-| MMED-04 | Phase 4 | Pending |
+| MMED-02 | Phase 4 | Complete |
+| MMED-03 | Phase 4 | Complete |
+| MMED-04 | Phase 4 | Complete |
 | MMED-05 | Phase 4 | Complete |
 | MMED-06 | Phase 4 | Complete |
 | MMED-07 | Phase 4 | Complete |

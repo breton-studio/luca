@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-04-03T20:23:03.703Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-04-03T20:36:15.127Z"
 last_activity: 2026-04-03
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 18
-  completed_plans: 15
-  percent: 0
+  completed_plans: 17
+  percent: 25
 ---
 
 # Project State
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 4
-Plan: 1 of 4 complete
-Status: Executing
+Plan: 2 of 4 complete
+Status: Ready to execute
 Last activity: 2026-04-03
 
 Progress: [██░░░░░░░░] 25%
@@ -66,6 +66,7 @@ Progress: [██░░░░░░░░] 25%
 | Phase 03 P04 | 3min | 2 tasks | 2 files |
 | Phase 04 P01 | 4min | 1 tasks | 4 files |
 | Phase 04 P02 | 4min | 2 tasks | 6 files |
+| Phase 04 P03 | 4min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,10 @@ Recent decisions affecting current work:
 - [Phase 04]: Lazy Runware SDK init -- SDK client created on first generateImage call, not at plugin load
 - [Phase 04]: 30s timeout on Runware via Promise.race -- prevents hung WebSocket from blocking pipeline
 - [Phase 04]: createFileNodeOnCanvas mirrors createTextNodeOnCanvas exact defensive pattern for consistency
+- [Phase 04]: Deferred node creation: first node created in onTextUpdate, enabling correct type-specific sizing
+- [Phase 04]: One-per-type enforcement via Set<string> -- duplicate types silently skipped, max 4 nodes total
+- [Phase 04]: Mermaid content buffered until </node> boundary, flushed as complete fenced code block
+- [Phase 04]: Image fireImageGeneration is async fire-and-forget -- Claude stream continues immediately
 
 ### Pending Todos
 
@@ -140,6 +145,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-03T20:23:03.700Z
-Stopped at: Completed 04-02-PLAN.md
-Resume file: .planning/phases/04-multi-medium-expansion/04-03-PLAN.md
+Last session: 2026-04-03T20:36:15.125Z
+Stopped at: Completed 04-03-PLAN.md
+Resume file: None

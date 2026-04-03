@@ -2,12 +2,12 @@ import { Plugin, Notice, Menu, WorkspaceLeaf } from 'obsidian';
 import type {} from 'obsidian-typings';
 import { CanvasAISettings, DEFAULT_SETTINGS } from './types/settings';
 import { CanvasAISettingTab } from './settings';
+import { StatusBarManager } from './ui/status-bar';
 
 export default class CanvasAIPlugin extends Plugin {
   settings!: CanvasAISettings;
   private statusBarEl: HTMLElement | null = null;
-  private currentState: 'idle' | 'thinking' | 'error' = 'idle';
-  private lastTriggerTime: string | null = null;
+  private statusBar!: StatusBarManager;
   private apiKeyNoticeShown = false;
 
   async onload(): Promise<void> {
@@ -18,12 +18,11 @@ export default class CanvasAIPlugin extends Plugin {
 
     // Status bar -- hidden by default, shown when enabled canvas is active
     this.statusBarEl = this.addStatusBarItem();
-    this.statusBarEl.addClass('canvas-ai-status');
-    this.statusBarEl.style.display = 'none';
+    this.statusBar = new StatusBarManager(this.statusBarEl);
 
     // Status bar click -> popover (D-02)
     this.registerDomEvent(this.statusBarEl, 'click', (evt: MouseEvent) => {
-      this.showStatusPopover(evt);
+      this.statusBar.showPopover(evt);
     });
 
     // Command palette toggle (FOUN-11)
@@ -44,6 +43,24 @@ export default class CanvasAIPlugin extends Plugin {
     this.registerEvent(
       this.app.workspace.on('active-leaf-change', (leaf: WorkspaceLeaf | null) => {
         this.onActiveLeafChange(leaf);
+      })
+    );
+
+    // Canvas context menu -- per-canvas enable/disable toggle (D-10)
+    this.registerEvent(
+      this.app.workspace.on('canvas:node-menu' as any, (menu: Menu, node: any) => {
+        const canvasPath = node?.canvas?.view?.file?.path;
+        if (!canvasPath) return;
+        const isEnabled = this.isCanvasEnabled(canvasPath);
+        menu.addSeparator();
+        menu.addItem((item: any) =>
+          item
+            .setTitle(isEnabled ? 'Disable Canvas AI' : 'Enable Canvas AI')
+            .setSection('canvas-ai')
+            .onClick(async () => {
+              await this.toggleCanvas(canvasPath);
+            })
+        );
       })
     );
 
@@ -71,58 +88,19 @@ export default class CanvasAIPlugin extends Plugin {
   // --- Status bar management (FOUN-12) ---
 
   setState(state: 'idle' | 'thinking' | 'error'): void {
-    this.currentState = state;
-    this.updateStatusBar();
+    this.statusBar.setState(state);
+    this.refreshStatusBar();
   }
 
   setLastTriggerTime(time: Date): void {
-    this.lastTriggerTime = time.toLocaleTimeString();
+    this.statusBar.setLastTriggerTime(time);
   }
 
-  private updateStatusBar(): void {
-    if (!this.statusBarEl) return;
-
+  private refreshStatusBar(): void {
     const canvasPath = this.getActiveCanvasPath();
-    if (!canvasPath) {
-      this.statusBarEl.style.display = 'none';
-      return;
-    }
-
-    // D-04: Hide status bar when canvas is disabled
-    if (this.settings.disabledCanvases.includes(canvasPath)) {
-      this.statusBarEl.style.display = 'none';
-      return;
-    }
-
-    this.statusBarEl.style.display = '';
-
-    // Remove all state classes
-    this.statusBarEl.removeClass('canvas-ai-status--idle', 'canvas-ai-status--thinking', 'canvas-ai-status--error');
-
-    // D-15: Show "no API key" if keys not configured
-    if (!this.settings.claudeApiKey) {
-      this.statusBarEl.setText('AI: no API key');
-      this.statusBarEl.addClass('canvas-ai-status--error');
-      return;
-    }
-
-    // D-01: Text badge states
-    this.statusBarEl.setText(`AI: ${this.currentState}`);
-    this.statusBarEl.addClass(`canvas-ai-status--${this.currentState}`);
-  }
-
-  // D-02: Status popover
-  private showStatusPopover(evt: MouseEvent): void {
-    const menu = new Menu();
-    menu.addItem((item) =>
-      item.setTitle(`State: ${this.currentState}`).setDisabled(true)
-    );
-    menu.addItem((item) =>
-      item
-        .setTitle(`Last trigger: ${this.lastTriggerTime ?? 'never'}`)
-        .setDisabled(true)
-    );
-    menu.showAtMouseEvent(evt);
+    const isEnabled = canvasPath ? this.isCanvasEnabled(canvasPath) : false;
+    const hasApiKey = !!this.settings.claudeApiKey;
+    this.statusBar.update(canvasPath, isEnabled, hasApiKey);
   }
 
   // D-15: First-run API key notice
@@ -147,7 +125,7 @@ export default class CanvasAIPlugin extends Plugin {
       this.settings.disabledCanvases.push(canvasPath);
     }
     await this.saveSettings();
-    this.updateStatusBar();
+    this.refreshStatusBar();
   }
 
   // --- Canvas view helpers ---
@@ -159,6 +137,6 @@ export default class CanvasAIPlugin extends Plugin {
   }
 
   private onActiveLeafChange(_leaf: WorkspaceLeaf | null): void {
-    this.updateStatusBar();
+    this.refreshStatusBar();
   }
 }

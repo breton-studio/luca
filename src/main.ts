@@ -101,7 +101,7 @@ export default class CanvasAIPlugin extends Plugin {
       if (!this.isCanvasEnabled(event.canvasPath)) return;
       // Only process if API key is configured
       if (!this.settings.claudeApiKey) return;
-      this.generationController?.handleCanvasEvent();
+      this.generationController?.handleCanvasEvent(event.nodeId);
     };
 
     // Custom canvas events use non-standard event names; cast to bypass Obsidian's typed overloads

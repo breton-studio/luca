@@ -17,14 +17,16 @@ export class GenerationController {
   private abortController: AbortController | null = null;
   private debouncedFire: Debouncer<[], void>;
   private delayMs: number;
+  private lastNodeId: string | undefined;
 
   /**
    * @param delaySeconds - Debounce delay in seconds (from settings, 1-10)
-   * @param onTrigger - Callback when debounce fires. Receives AbortSignal for cancellation.
+   * @param onTrigger - Callback when debounce fires. Receives AbortSignal for cancellation
+   *                    and the trigger node ID (if available) for spatial context.
    */
   constructor(
     delaySeconds: number,
-    private onTrigger: (signal: AbortSignal) => void | Promise<void>
+    private onTrigger: (signal: AbortSignal, triggerNodeId?: string) => void | Promise<void>
   ) {
     this.delayMs = delaySeconds * 1000;
     this.debouncedFire = debounce(
@@ -37,9 +39,12 @@ export class GenerationController {
   /**
    * Called on every canvas event (create, edit, move, delete).
    * Restarts the debounce timer. If the timer was already running,
-   * it resets to the full delay.
+   * it resets to the full delay. Tracks the last node ID for spatial context.
+   *
+   * @param nodeId - Optional node ID from the canvas event
    */
-  handleCanvasEvent(): void {
+  handleCanvasEvent(nodeId?: string): void {
+    if (nodeId) this.lastNodeId = nodeId;
     this.debouncedFire();
   }
 
@@ -59,9 +64,13 @@ export class GenerationController {
     // Create fresh abort controller for this generation cycle
     this.abortController = new AbortController();
 
-    // Fire the generation callback
+    // Consume the last node ID for this generation cycle
+    const nodeId = this.lastNodeId;
+    this.lastNodeId = undefined;
+
+    // Fire the generation callback with signal and trigger node ID
     try {
-      this.onTrigger(this.abortController.signal);
+      this.onTrigger(this.abortController.signal, nodeId);
     } catch (err) {
       console.error('[Canvas AI] Generation trigger error:', err);
     }

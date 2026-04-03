@@ -3,6 +3,7 @@ import type {} from 'obsidian-typings';
 import { CanvasAISettings, DEFAULT_SETTINGS } from './types/settings';
 import { CanvasAISettingTab } from './settings';
 import { StatusBarManager } from './ui/status-bar';
+import { initCanvasPatching } from './canvas/canvas-patcher';
 
 export default class CanvasAIPlugin extends Plugin {
   settings!: CanvasAISettings;
@@ -69,9 +70,10 @@ export default class CanvasAIPlugin extends Plugin {
       this.showApiKeyNotice();
     }
 
+    // Canvas event patching (FOUN-04, FOUN-05, FOUN-06, FOUN-07)
+    initCanvasPatching(this);
+
     // --- EXTENSION POINTS (filled by later plans) ---
-    // Plan 02: Canvas adapter initialization
-    // Plan 04: Canvas event patching (initCanvasPatching)
     // Plan 05: Debounce controller wiring
   }
 

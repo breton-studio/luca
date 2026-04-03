@@ -104,18 +104,12 @@ export default class CanvasAIPlugin extends Plugin {
       this.generationController?.handleCanvasEvent();
     };
 
-    this.registerEvent(
-      this.app.workspace.on(CANVAS_EVENT_TYPES.NODE_CREATED as any, canvasEventHandler)
-    );
-    this.registerEvent(
-      this.app.workspace.on(CANVAS_EVENT_TYPES.NODE_REMOVED as any, canvasEventHandler)
-    );
-    this.registerEvent(
-      this.app.workspace.on(CANVAS_EVENT_TYPES.NODE_MOVED as any, canvasEventHandler)
-    );
-    this.registerEvent(
-      this.app.workspace.on(CANVAS_EVENT_TYPES.CANVAS_CHANGED as any, canvasEventHandler)
-    );
+    // Custom canvas events use non-standard event names; cast to bypass Obsidian's typed overloads
+    const ws = this.app.workspace as any;
+    this.registerEvent(ws.on(CANVAS_EVENT_TYPES.NODE_CREATED, canvasEventHandler));
+    this.registerEvent(ws.on(CANVAS_EVENT_TYPES.NODE_REMOVED, canvasEventHandler));
+    this.registerEvent(ws.on(CANVAS_EVENT_TYPES.NODE_MOVED, canvasEventHandler));
+    this.registerEvent(ws.on(CANVAS_EVENT_TYPES.CANVAS_CHANGED, canvasEventHandler));
   }
 
   onunload(): void {

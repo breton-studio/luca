@@ -123,8 +123,8 @@ export class CanvasAdapter {
       type: this.resolveNodeType(node),
       x: node.x ?? bbox.minX ?? 0,
       y: node.y ?? bbox.minY ?? 0,
-      width: node.width ?? (bbox.maxX - bbox.minX) ?? 300,
-      height: node.height ?? (bbox.maxY - bbox.minY) ?? 200,
+      width: node.width ?? ((bbox.maxX - bbox.minX) || 300),
+      height: node.height ?? ((bbox.maxY - bbox.minY) || 200),
       content: this.resolveContent(node),
       color: node.color ?? undefined,
     };

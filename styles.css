@@ -1,0 +1,25 @@
+/* Status bar indicator */
+.canvas-ai-status {
+  cursor: pointer;
+}
+
+.canvas-ai-status--idle {
+  color: var(--text-muted);
+}
+
+.canvas-ai-status--thinking {
+  color: var(--text-normal);
+}
+
+.canvas-ai-status--error {
+  color: var(--text-error);
+}
+
+/* Settings validation feedback */
+.canvas-ai-valid {
+  color: var(--text-success);
+}
+
+.canvas-ai-invalid {
+  color: var(--text-error);
+}

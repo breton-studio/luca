@@ -17,8 +17,8 @@
 - [ ] **FOUN-08**: Debounce timer triggers generation after ~3s of user idle (configurable)
 - [ ] **FOUN-09**: In-flight generation requests are cancelled when new debounce fires (AbortController)
 - [x] **FOUN-10**: Settings UI with fields for Claude API key, Runware API key, and debounce delay
-- [ ] **FOUN-11**: Enable/disable toggle accessible from command palette and status bar
-- [ ] **FOUN-12**: Generation indicator in status bar shows thinking/idle/error state
+- [x] **FOUN-11**: Enable/disable toggle accessible from command palette and status bar
+- [x] **FOUN-12**: Generation indicator in status bar shows thinking/idle/error state
 - [x] **FOUN-13**: Canvas Adapter handles requestSave race condition (uses internal API, not vault.modify)
 
 ### Spatial Intelligence
@@ -120,8 +120,8 @@
 | FOUN-08 | Phase 1 | Pending |
 | FOUN-09 | Phase 1 | Pending |
 | FOUN-10 | Phase 1 | Complete |
-| FOUN-11 | Phase 1 | Pending |
-| FOUN-12 | Phase 1 | Pending |
+| FOUN-11 | Phase 1 | Complete |
+| FOUN-12 | Phase 1 | Complete |
 | FOUN-13 | Phase 1 | Complete |
 | SPAT-01 | Phase 2 | Pending |
 | SPAT-02 | Phase 2 | Pending |

@@ -28,8 +28,8 @@
 - [x] **SPAT-03**: Nearby nodes interpreted as conceptually related (proximity-as-semantics)
 - [x] **SPAT-04**: Distant nodes interpreted as weakly related or tangential
 - [x] **SPAT-05**: Dense node clusters detected as focus areas (density-based analysis)
-- [ ] **SPAT-06**: Spatial context serialized into structured narrative for LLM prompt
-- [ ] **SPAT-07**: Only nearby/relevant nodes sent to Claude (not entire canvas) for cost efficiency
+- [x] **SPAT-06**: Spatial context serialized into structured narrative for LLM prompt
+- [x] **SPAT-07**: Only nearby/relevant nodes sent to Claude (not entire canvas) for cost efficiency
 - [x] **SPAT-08**: Generated nodes placed in contextually appropriate positions (extend direction, bridge gaps)
 - [x] **SPAT-09**: Collision-free placement using bounding-box detection (no overlapping nodes)
 - [x] **SPAT-10**: Placement accounts for canvas zoom and pan offsets
@@ -128,8 +128,8 @@
 | SPAT-03 | Phase 2 | Complete |
 | SPAT-04 | Phase 2 | Complete |
 | SPAT-05 | Phase 2 | Complete |
-| SPAT-06 | Phase 2 | Pending |
-| SPAT-07 | Phase 2 | Pending |
+| SPAT-06 | Phase 2 | Complete |
+| SPAT-07 | Phase 2 | Complete |
 | SPAT-08 | Phase 2 | Complete |
 | SPAT-09 | Phase 2 | Complete |
 | SPAT-10 | Phase 2 | Complete |

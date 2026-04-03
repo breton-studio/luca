@@ -52,7 +52,7 @@ Plans:
 Plans:
 - [x] 02-01-PLAN.md -- Spatial types, proximity graph, canvas edge reading, test fixtures
 - [x] 02-02-PLAN.md -- DBSCAN clustering and collision-free orbital placement
-- [ ] 02-03-PLAN.md -- Context builder, narrative serialization, barrel export
+- [x] 02-03-PLAN.md -- Context builder, narrative serialization, barrel export
 
 ### Phase 3: Core Generation Loop
 **Goal**: After the user acts on the canvas and goes idle, Claude reads spatial context and a taste profile, then streams new text/markdown nodes that appear progressively near the action area -- closing the core value loop

@@ -1,4 +1,5 @@
 import { streamIntoNode, parseNodeContent, StreamCallbacks, StreamResult } from '../../src/ai/stream-handler';
+import type { TypedNodeMeta } from '../../src/types/generation';
 import { MockStream, MockAnthropicClient, createMockClientWithStream } from '../__mocks__/anthropic';
 import { BUFFER_INTERVAL_MS } from '../../src/types/settings';
 
@@ -12,8 +13,8 @@ jest.mock('@anthropic-ai/sdk', () => {
 
 describe('stream-handler', () => {
   let callbacks: StreamCallbacks & {
-    textUpdates: string[];
-    boundaryEvents: Array<{ content: string; index: number }>;
+    textUpdates: Array<{ text: string; meta: TypedNodeMeta }>;
+    boundaryEvents: Array<{ content: string; index: number; meta: TypedNodeMeta }>;
     firstTokenCalled: boolean;
     timeoutCalled: boolean;
   };
@@ -28,14 +29,14 @@ describe('stream-handler', () => {
       onFirstToken: jest.fn(() => {
         callbacks.firstTokenCalled = true;
       }),
-      onTextUpdate: jest.fn((text: string) => {
-        callbacks.textUpdates.push(text);
+      onTextUpdate: jest.fn((text: string, meta: TypedNodeMeta) => {
+        callbacks.textUpdates.push({ text, meta });
       }),
       onTimeout: jest.fn(() => {
         callbacks.timeoutCalled = true;
       }),
-      onNodeBoundary: jest.fn((content: string, index: number) => {
-        callbacks.boundaryEvents.push({ content, index });
+      onNodeBoundary: jest.fn((content: string, index: number, meta: TypedNodeMeta) => {
+        callbacks.boundaryEvents.push({ content, index, meta });
       }),
     };
   });
@@ -311,8 +312,8 @@ describe('stream-handler', () => {
 
       const result = await resultPromise;
 
-      expect(callbacks.onNodeBoundary).toHaveBeenCalledWith('First content', 0);
-      expect(callbacks.boundaryEvents[0]).toEqual({ content: 'First content', index: 0 });
+      expect(callbacks.onNodeBoundary).toHaveBeenCalledWith('First content', 0, expect.objectContaining({ type: 'text' }));
+      expect(callbacks.boundaryEvents[0]).toEqual(expect.objectContaining({ content: 'First content', index: 0 }));
     });
 
     test('onTextUpdate receives only the current node visible content (tags stripped)', async () => {
@@ -336,9 +337,9 @@ describe('stream-handler', () => {
 
       // Check that the flushed text does not contain <node> tags
       const lastUpdate = callbacks.textUpdates[callbacks.textUpdates.length - 1];
-      expect(lastUpdate).not.toContain('<node>');
-      expect(lastUpdate).not.toContain('</node>');
-      expect(lastUpdate).toContain('visible text');
+      expect(lastUpdate.text).not.toContain('<node>');
+      expect(lastUpdate.text).not.toContain('</node>');
+      expect(lastUpdate.text).toContain('visible text');
 
       stream.emitText('</node>');
       jest.advanceTimersByTime(BUFFER_INTERVAL_MS + 10);
@@ -373,14 +374,278 @@ describe('stream-handler', () => {
 
       // The most recent text update should contain second node content, not first
       const lastUpdate = callbacks.textUpdates[callbacks.textUpdates.length - 1];
-      expect(lastUpdate).toContain('Second node content');
-      expect(lastUpdate).not.toContain('First node content');
+      expect(lastUpdate.text).toContain('Second node content');
+      expect(lastUpdate.text).not.toContain('First node content');
 
       stream.emitText('</node>');
       jest.advanceTimersByTime(BUFFER_INTERVAL_MS + 10);
 
       const result = await resultPromise;
       expect(result).toBeDefined();
+    });
+  });
+
+  describe('typed node parsing', () => {
+    describe('parseNodeContent with typed tags', () => {
+      test('parses <node type="text"> content', () => {
+        const text = '<node type="text">hello</node>';
+        const result = parseNodeContent(text);
+        expect(result).toEqual(['hello']);
+      });
+
+      test('parses <node type="code" lang="typescript"> content', () => {
+        const text = '<node type="code" lang="typescript">const x = 1;</node>';
+        const result = parseNodeContent(text);
+        expect(result).toEqual(['const x = 1;']);
+      });
+
+      test('parses <node type="mermaid"> content', () => {
+        const text = '<node type="mermaid">graph TD\n  A-->B</node>';
+        const result = parseNodeContent(text);
+        expect(result).toEqual(['graph TD\n  A-->B']);
+      });
+
+      test('parses <node type="image"> content', () => {
+        const text = '<node type="image">a sunset over mountains</node>';
+        const result = parseNodeContent(text);
+        expect(result).toEqual(['a sunset over mountains']);
+      });
+
+      test('parses mixed types and returns all contents in order', () => {
+        const text = [
+          '<node type="text">Some explanation</node>',
+          '<node type="code" lang="python">print("hello")</node>',
+          '<node type="mermaid">graph LR\n  A-->B</node>',
+        ].join('\n\n');
+        const result = parseNodeContent(text);
+        expect(result).toEqual([
+          'Some explanation',
+          'print("hello")',
+          'graph LR\n  A-->B',
+        ]);
+      });
+
+      test('backward compat: untyped <node> tags still work', () => {
+        const text = '<node>First content</node>\n\n<node>Second content</node>';
+        const result = parseNodeContent(text);
+        expect(result).toEqual(['First content', 'Second content']);
+      });
+
+      test('backward compat: no tags returns [entireText]', () => {
+        const text = 'Just plain text without any delimiters';
+        const result = parseNodeContent(text);
+        expect(result).toEqual(['Just plain text without any delimiters']);
+      });
+    });
+
+    describe('onNodeBoundary with typed metadata', () => {
+      test('receives TypedNodeMeta { type: "code", lang: "typescript" } for code nodes', async () => {
+        const { client, stream } = createMockClientWithStream(
+          [],
+          { input_tokens: 10, output_tokens: 5 }
+        );
+
+        const signal = new AbortController().signal;
+
+        const resultPromise = streamIntoNode(
+          client as any,
+          [{ type: 'text', text: 'system prompt' }],
+          'user message',
+          signal,
+          callbacks
+        );
+
+        stream.emitText('<node type="code" lang="typescript">const x = 1;</node>');
+        jest.advanceTimersByTime(BUFFER_INTERVAL_MS + 10);
+
+        const result = await resultPromise;
+
+        expect(callbacks.boundaryEvents.length).toBeGreaterThanOrEqual(1);
+        expect(callbacks.boundaryEvents[0].meta).toEqual({ type: 'code', lang: 'typescript' });
+      });
+
+      test('receives TypedNodeMeta { type: "mermaid" } (no lang) for mermaid nodes', async () => {
+        const { client, stream } = createMockClientWithStream(
+          [],
+          { input_tokens: 10, output_tokens: 5 }
+        );
+
+        const signal = new AbortController().signal;
+
+        const resultPromise = streamIntoNode(
+          client as any,
+          [{ type: 'text', text: 'system prompt' }],
+          'user message',
+          signal,
+          callbacks
+        );
+
+        stream.emitText('<node type="mermaid">graph TD\n  A-->B</node>');
+        jest.advanceTimersByTime(BUFFER_INTERVAL_MS + 10);
+
+        const result = await resultPromise;
+
+        expect(callbacks.boundaryEvents.length).toBeGreaterThanOrEqual(1);
+        expect(callbacks.boundaryEvents[0].meta).toEqual({ type: 'mermaid' });
+      });
+
+      test('receives TypedNodeMeta { type: "image" } for image nodes', async () => {
+        const { client, stream } = createMockClientWithStream(
+          [],
+          { input_tokens: 10, output_tokens: 5 }
+        );
+
+        const signal = new AbortController().signal;
+
+        const resultPromise = streamIntoNode(
+          client as any,
+          [{ type: 'text', text: 'system prompt' }],
+          'user message',
+          signal,
+          callbacks
+        );
+
+        stream.emitText('<node type="image">a sunset over mountains</node>');
+        jest.advanceTimersByTime(BUFFER_INTERVAL_MS + 10);
+
+        const result = await resultPromise;
+
+        expect(callbacks.boundaryEvents.length).toBeGreaterThanOrEqual(1);
+        expect(callbacks.boundaryEvents[0].meta).toEqual({ type: 'image' });
+      });
+
+      test('mixed types produce correct meta for each boundary', async () => {
+        const { client, stream } = createMockClientWithStream(
+          [],
+          { input_tokens: 10, output_tokens: 5 }
+        );
+
+        const signal = new AbortController().signal;
+
+        const resultPromise = streamIntoNode(
+          client as any,
+          [{ type: 'text', text: 'system prompt' }],
+          'user message',
+          signal,
+          callbacks
+        );
+
+        stream.emitText('<node type="text">explanation</node>');
+        jest.advanceTimersByTime(BUFFER_INTERVAL_MS + 10);
+        stream.emitText('\n\n<node type="code" lang="python">print("hi")</node>');
+        jest.advanceTimersByTime(BUFFER_INTERVAL_MS + 10);
+
+        const result = await resultPromise;
+
+        expect(callbacks.boundaryEvents.length).toBe(2);
+        expect(callbacks.boundaryEvents[0].meta).toEqual({ type: 'text' });
+        expect(callbacks.boundaryEvents[1].meta).toEqual({ type: 'code', lang: 'python' });
+      });
+    });
+
+    describe('onTextUpdate with typed metadata', () => {
+      test('receives TypedNodeMeta so caller knows current node type', async () => {
+        const { client, stream } = createMockClientWithStream(
+          [],
+          { input_tokens: 10, output_tokens: 5 }
+        );
+
+        const signal = new AbortController().signal;
+
+        const resultPromise = streamIntoNode(
+          client as any,
+          [{ type: 'text', text: 'system prompt' }],
+          'user message',
+          signal,
+          callbacks
+        );
+
+        stream.emitText('<node type="code" lang="typescript">const x = 1;');
+        jest.advanceTimersByTime(BUFFER_INTERVAL_MS + 10);
+
+        // Should have received at least one text update with code meta
+        const codeUpdates = callbacks.textUpdates.filter(u => u.meta.type === 'code');
+        expect(codeUpdates.length).toBeGreaterThan(0);
+        expect(codeUpdates[0].meta).toEqual({ type: 'code', lang: 'typescript' });
+
+        stream.emitText('</node>');
+        jest.advanceTimersByTime(BUFFER_INTERVAL_MS + 10);
+
+        const result = await resultPromise;
+        expect(result).toBeDefined();
+      });
+    });
+
+    describe('extractCurrentNodeVisibleText strips typed opening tags', () => {
+      test('typed opening tags are stripped from visible text', async () => {
+        const { client, stream } = createMockClientWithStream(
+          [],
+          { input_tokens: 10, output_tokens: 5 }
+        );
+
+        const signal = new AbortController().signal;
+
+        const resultPromise = streamIntoNode(
+          client as any,
+          [{ type: 'text', text: 'system prompt' }],
+          'user message',
+          signal,
+          callbacks
+        );
+
+        stream.emitText('<node type="code" lang="typescript">visible code');
+        jest.advanceTimersByTime(BUFFER_INTERVAL_MS + 10);
+
+        const lastUpdate = callbacks.textUpdates[callbacks.textUpdates.length - 1];
+        expect(lastUpdate.text).not.toContain('<node');
+        expect(lastUpdate.text).not.toContain('type=');
+        expect(lastUpdate.text).toContain('visible code');
+
+        stream.emitText('</node>');
+        jest.advanceTimersByTime(BUFFER_INTERVAL_MS + 10);
+
+        const result = await resultPromise;
+        expect(result).toBeDefined();
+      });
+    });
+
+    describe('partial typed tag detection', () => {
+      test('partial typed tag at end of chunk does not leak into visible text', async () => {
+        const { client, stream } = createMockClientWithStream(
+          [],
+          { input_tokens: 10, output_tokens: 5 }
+        );
+
+        const signal = new AbortController().signal;
+
+        const resultPromise = streamIntoNode(
+          client as any,
+          [{ type: 'text', text: 'system prompt' }],
+          'user message',
+          signal,
+          callbacks
+        );
+
+        // First node completes, then a partial typed tag arrives
+        stream.emitText('<node type="text">first content</node>');
+        jest.advanceTimersByTime(BUFFER_INTERVAL_MS + 10);
+
+        // Partial tag: '<node t' without closing '>'
+        stream.emitText('\n\n<node t');
+        jest.advanceTimersByTime(BUFFER_INTERVAL_MS + 10);
+
+        // None of the text updates after the boundary should contain '<node t'
+        for (const update of callbacks.textUpdates) {
+          expect(update.text).not.toContain('<node t');
+        }
+
+        // Complete the tag
+        stream.emitText('ype="code" lang="python">x = 1</node>');
+        jest.advanceTimersByTime(BUFFER_INTERVAL_MS + 10);
+
+        const result = await resultPromise;
+        expect(result).toBeDefined();
+      });
     });
   });
 });

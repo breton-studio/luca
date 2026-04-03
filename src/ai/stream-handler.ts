@@ -1,11 +1,12 @@
 /**
- * Stream handler with buffered updates, watchdog, and node boundary detection
- * (GENP-03, GENP-04, GENP-11, D-03).
+ * Stream handler with buffered updates, watchdog, and typed node boundary detection
+ * (GENP-03, GENP-04, GENP-11, D-01, D-03).
  *
  * Streams Claude responses with:
  * - Buffered text flushing at BUFFER_INTERVAL_MS intervals
- * - Tag-aware accumulation that strips <node>/<\/node> from visible text
- * - Mid-stream </node> boundary detection with onNodeBoundary callback
+ * - Tag-aware accumulation that strips <node type="...">/<\/node> from visible text
+ * - Typed node tag parsing: extracts type and optional lang attributes (D-01)
+ * - Mid-stream </node> boundary detection with onNodeBoundary callback + TypedNodeMeta
  * - Timeout watchdog that fires after 30s of silence
  * - AbortSignal support for cancellation
  */
@@ -13,8 +14,23 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { BUFFER_INTERVAL_MS } from '../types/settings';
 import type { SystemPromptBlock } from './prompt-builder';
+import type { TypedNodeMeta } from '../types/generation';
+
+export type { TypedNodeMeta } from '../types/generation';
 
 const WATCHDOG_TIMEOUT_MS = 30_000; // 30 seconds (GENP-11)
+
+/**
+ * Regex for matching typed node opening tags (D-01).
+ * Matches: <node type="text">, <node type="code" lang="typescript">, etc.
+ */
+const TYPED_NODE_OPEN_RE = /<node\s+type="(text|code|mermaid|image)"(?:\s+lang="([^"]*)")?\s*>/;
+
+/**
+ * Regex for matching any node opening tag (typed or untyped).
+ * Used for finding opening tags in accumulated text.
+ */
+const ANY_NODE_OPEN_RE = /<node(?:\s+type="(text|code|mermaid|image)"(?:\s+lang="([^"]*)")?)?\s*>/g;
 
 export interface StreamResult {
   text: string;
@@ -24,88 +40,134 @@ export interface StreamResult {
 
 export interface StreamCallbacks {
   onFirstToken: () => void;              // Remove pulsing, set status to streaming
-  onTextUpdate: (text: string) => void;  // Buffered text flush -- current node's visible content only
+  onTextUpdate: (text: string, meta: TypedNodeMeta) => void;  // Buffered text flush with node type metadata
   onTimeout: () => void;                 // Watchdog fired (GENP-11)
   /**
    * Called when a </node> closing tag is detected mid-stream (D-03).
-   * Provides the completed node's content (tags stripped) and its
-   * zero-based index. The caller should use this to finalize the
-   * current canvas node and pre-allocate the next one. After this
-   * callback returns, subsequent onTextUpdate calls will contain
-   * the NEW node's content (the caller should redirect updates to
-   * the newly created canvas node).
+   * Provides the completed node's content (tags stripped), its
+   * zero-based index, and its TypedNodeMeta. The caller should use
+   * this to finalize the current canvas node and pre-allocate the
+   * next one. After this callback returns, subsequent onTextUpdate
+   * calls will contain the NEW node's content with its own meta.
    */
-  onNodeBoundary: (completedNodeContent: string, nodeIndex: number) => void;
+  onNodeBoundary: (completedNodeContent: string, nodeIndex: number, meta: TypedNodeMeta) => void;
 }
 
 /**
  * Parse streamed response into individual node contents (D-02).
- * Splits on <node>...</node> delimiters. If no delimiters found,
- * treats entire text as a single node.
+ * Splits on <node type="...">...</node> delimiters.
+ * Falls back to untyped <node>...</node> for backward compatibility.
+ * If no delimiters found, treats entire text as a single node.
  */
 export function parseNodeContent(responseText: string): string[] {
-  const regex = /<node>([\s\S]*?)<\/node>/g;
+  // Try typed tags first
+  const typedRegex = /<node\s+type="(?:text|code|mermaid|image)"(?:\s+lang="[^"]*")?\s*>([\s\S]*?)<\/node>/g;
   const matches: string[] = [];
   let match: RegExpExecArray | null;
 
-  while ((match = regex.exec(responseText)) !== null) {
+  while ((match = typedRegex.exec(responseText)) !== null) {
     matches.push(match[1].trim());
   }
 
-  if (matches.length === 0) {
-    return [responseText.trim()];
+  if (matches.length > 0) return matches;
+
+  // Fall back to untyped tags for backward compatibility
+  const untypedRegex = /<node>([\s\S]*?)<\/node>/g;
+  while ((match = untypedRegex.exec(responseText)) !== null) {
+    matches.push(match[1].trim());
   }
 
-  return matches;
+  if (matches.length > 0) return matches;
+
+  return [responseText.trim()];
 }
 
-// Possible partial tag prefixes to hold back from visible text
-const PARTIAL_OPEN_TAGS = ['<', '<n', '<no', '<nod', '<node'];
+// Possible partial closing tag prefixes to hold back from visible text
 const PARTIAL_CLOSE_TAGS = ['</', '</n', '</no', '</nod', '</node'];
 
 /**
  * Check if text ends with a partial tag that should be held back.
  * Returns the length of the partial tag suffix, or 0 if none.
+ *
+ * Handles both untyped <node> and typed <node type="..." lang="..."> patterns.
+ * For typed tags, detects partial patterns like '<node t', '<node type="co', etc.
  */
 function partialTagSuffixLength(text: string): number {
-  // Check close tags first (longer prefixes first for greedy match)
+  // Check close tags first (higher priority)
   for (let i = PARTIAL_CLOSE_TAGS.length - 1; i >= 0; i--) {
     const partial = PARTIAL_CLOSE_TAGS[i];
     if (text.endsWith(partial)) return partial.length;
   }
-  // Check open tags
-  for (let i = PARTIAL_OPEN_TAGS.length - 1; i >= 0; i--) {
-    const partial = PARTIAL_OPEN_TAGS[i];
-    if (text.endsWith(partial)) return partial.length;
+
+  // Check for partial/complete-but-unclosed opening tag: <node...> not yet closed with >
+  // Find last '<' and check if it starts a node tag without closing '>'
+  const lastAngle = text.lastIndexOf('<');
+  if (lastAngle >= 0) {
+    const tail = text.substring(lastAngle);
+    // If tail starts with '<node' and has no '>', hold it back (typed tag being built)
+    if (tail.startsWith('<node') && !tail.includes('>')) {
+      return tail.length;
+    }
+    // Also check shorter partial prefixes: '<', '<n', '<no', '<nod'
+    if (['<', '<n', '<no', '<nod'].some(p => tail === p)) {
+      return tail.length;
+    }
   }
+
   return 0;
 }
 
 /**
- * Extract visible text from raw accumulated text for the current node.
- * Strips any <node> or </node> tags and holds back partial tag suffixes.
+ * Find all node opening tags in text and return their positions and metadata.
+ * Returns array of { index, length, meta } for each opening tag found.
  */
-function extractCurrentNodeVisibleText(rawAccumulated: string, nodeIndex: number): string {
-  // Find the start of the current node's content
-  let searchFrom = 0;
-  let nodesFound = 0;
+function findNodeOpenings(rawText: string): Array<{ index: number; length: number; meta: TypedNodeMeta }> {
+  const results: Array<{ index: number; length: number; meta: TypedNodeMeta }> = [];
+  const regex = new RegExp(ANY_NODE_OPEN_RE.source, 'g');
+  let match: RegExpExecArray | null;
 
-  // Skip past completed nodes
-  while (nodesFound < nodeIndex) {
-    const closeIdx = rawAccumulated.indexOf('</node>', searchFrom);
-    if (closeIdx === -1) break;
-    searchFrom = closeIdx + '</node>'.length;
-    nodesFound++;
+  while ((match = regex.exec(rawText)) !== null) {
+    const type = (match[1] || 'text') as TypedNodeMeta['type'];
+    const lang = match[2] || undefined;
+    const meta: TypedNodeMeta = lang ? { type, lang } : { type };
+    results.push({
+      index: match.index,
+      length: match[0].length,
+      meta,
+    });
   }
 
-  // Find the opening <node> tag for the current node
-  const openIdx = rawAccumulated.indexOf('<node>', searchFrom);
-  if (openIdx === -1) {
+  return results;
+}
+
+/**
+ * Extract visible text from raw accumulated text for the current node.
+ * Strips any <node ...> or </node> tags and holds back partial tag suffixes.
+ * Handles both typed <node type="..."> and untyped <node> opening tags.
+ */
+function extractCurrentNodeVisibleText(rawAccumulated: string, nodeIndex: number): string {
+  // Find all opening tags
+  const openings = findNodeOpenings(rawAccumulated);
+
+  if (openings.length === 0 || nodeIndex >= openings.length) {
     // No opening tag yet for this node index -- return empty
     return '';
   }
 
-  const contentStart = openIdx + '<node>'.length;
+  // Skip past completed nodes to find the current one
+  // We need to track close tags to determine which nodes are complete
+  let closeCount = 0;
+  let searchFrom = 0;
+  while (closeCount < nodeIndex) {
+    const closeIdx = rawAccumulated.indexOf('</node>', searchFrom);
+    if (closeIdx === -1) break;
+    searchFrom = closeIdx + '</node>'.length;
+    closeCount++;
+  }
+
+  // The current node's opening tag
+  const currentOpening = openings[nodeIndex];
+  const contentStart = currentOpening.index + currentOpening.length;
 
   // Get everything after the opening tag
   let content = rawAccumulated.substring(contentStart);
@@ -126,15 +188,17 @@ function extractCurrentNodeVisibleText(rawAccumulated: string, nodeIndex: number
 }
 
 /**
- * Stream a Claude response with buffered updates and node boundary detection
- * (GENP-03, GENP-04, D-03).
+ * Stream a Claude response with buffered updates and typed node boundary detection
+ * (GENP-03, GENP-04, D-01, D-03).
  *
  * Key behavior for multi-node streaming (D-03):
  * - Accumulates raw text deltas from the API
- * - Tracks which <node> we're currently inside (nodeIndex)
- * - Strips <node>/<\/node> tags from the text flushed to onTextUpdate
+ * - Tracks which <node type="..."> we're currently inside (nodeIndex)
+ * - Parses type and lang attributes from opening tags into TypedNodeMeta
+ * - Strips typed node tags from the text flushed to onTextUpdate
  * - When </node> is detected mid-stream, calls onNodeBoundary with the
- *   completed node content and its index
+ *   completed node content, its index, and its TypedNodeMeta
+ * - Passes current TypedNodeMeta to onTextUpdate so callers can route rendering
  * - Flushes accumulated visible text to onTextUpdate at BUFFER_INTERVAL_MS
  * - Calls onFirstToken once when the first text delta arrives
  * - Watchdog fires onTimeout after 30s of no deltas (GENP-11)
@@ -157,8 +221,11 @@ export async function streamIntoNode(
 
   // Track how many </node> closings we've processed
   let processedCloseCount = 0;
-  // Track how many <node> openings we've processed
+  // Track how many opening tags we've processed
   let processedOpenCount = 0;
+
+  // Track metadata for each node opening tag (indexed by open order)
+  const nodeMetas: TypedNodeMeta[] = [];
 
   // Watchdog timer
   let watchdogTimer: ReturnType<typeof setTimeout> | null = null;
@@ -193,25 +260,20 @@ export async function streamIntoNode(
   function flushCurrentNodeText(): void {
     const visibleText = extractCurrentNodeVisibleText(rawAccumulated, nodeIndex);
     if (visibleText.length > 0) {
-      callbacks.onTextUpdate(visibleText);
+      const currentMeta = nodeMetas[nodeIndex] ?? { type: 'text' as const };
+      callbacks.onTextUpdate(visibleText, currentMeta);
       lastFlushTime = Date.now();
     }
   }
 
   // Process tag boundaries in the accumulated text
   function processTagBoundaries(): void {
-    // Count <node> openings
-    let searchFrom = 0;
-    let openCount = 0;
-    while (true) {
-      const idx = rawAccumulated.indexOf('<node>', searchFrom);
-      if (idx === -1) break;
-      openCount++;
-      searchFrom = idx + '<node>'.length;
-    }
+    // Find all opening tags and their metadata
+    const openings = findNodeOpenings(rawAccumulated);
+    const openCount = openings.length;
 
     // Count </node> closings
-    searchFrom = 0;
+    let searchFrom = 0;
     let closeCount = 0;
     while (true) {
       const idx = rawAccumulated.indexOf('</node>', searchFrom);
@@ -220,17 +282,19 @@ export async function streamIntoNode(
       searchFrom = idx + '</node>'.length;
     }
 
-    // Process any new openings
-    if (openCount > processedOpenCount) {
+    // Process any new openings -- store their metadata
+    while (processedOpenCount < openCount) {
+      nodeMetas[processedOpenCount] = openings[processedOpenCount].meta;
+      processedOpenCount++;
       insideNode = true;
-      processedOpenCount = openCount;
     }
 
     // Process any new closings
     while (closeCount > processedCloseCount) {
       // A node just closed
       const nodeContent = extractNodeContentByIndex(rawAccumulated, processedCloseCount);
-      callbacks.onNodeBoundary(nodeContent, processedCloseCount);
+      const meta = nodeMetas[processedCloseCount] ?? { type: 'text' as const };
+      callbacks.onNodeBoundary(nodeContent, processedCloseCount, meta);
       completedNodes.push(nodeContent);
       processedCloseCount++;
       nodeIndex = processedCloseCount;
@@ -285,7 +349,8 @@ export async function streamIntoNode(
   // Final flush of any remaining text
   const finalVisibleText = extractCurrentNodeVisibleText(rawAccumulated, nodeIndex);
   if (finalVisibleText.length > 0) {
-    callbacks.onTextUpdate(finalVisibleText);
+    const currentMeta = nodeMetas[nodeIndex] ?? { type: 'text' as const };
+    callbacks.onTextUpdate(finalVisibleText, currentMeta);
   }
 
   return {
@@ -301,18 +366,21 @@ export async function streamIntoNode(
 /**
  * Extract the content of a specific node by its zero-based index.
  * Used internally when a node boundary is detected.
+ * Handles both typed and untyped opening tags.
  */
 function extractNodeContentByIndex(rawText: string, nodeIndex: number): string {
-  const regex = /<node>([\s\S]*?)<\/node>/g;
-  let match: RegExpExecArray | null;
-  let currentIndex = 0;
+  // Find all opening tags
+  const openings = findNodeOpenings(rawText);
 
-  while ((match = regex.exec(rawText)) !== null) {
-    if (currentIndex === nodeIndex) {
-      return match[1].trim();
-    }
-    currentIndex++;
-  }
+  if (nodeIndex >= openings.length) return '';
 
-  return '';
+  const opening = openings[nodeIndex];
+  const contentStart = opening.index + opening.length;
+  const remaining = rawText.substring(contentStart);
+
+  // Find the matching </node>
+  const closeIdx = remaining.indexOf('</node>');
+  if (closeIdx === -1) return remaining.trim();
+
+  return remaining.substring(0, closeIdx).trim();
 }

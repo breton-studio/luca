@@ -84,7 +84,7 @@ Plans:
   5. Each generation produces at most one node per content type (1 text + 1 code + 1 diagram + 1 image max) — no duplicate types
 **Plans**: 4 plans
 Plans:
-- [ ] 04-01-PLAN.md -- Typed node tag parsing in stream handler
+- [x] 04-01-PLAN.md -- Typed node tag parsing in stream handler
 - [ ] 04-02-PLAN.md -- Runware image client, image saver, canvas file node adapter
 - [ ] 04-03-PLAN.md -- Prompt builder update, pipeline wiring, settings, CSS
 - [ ] 04-04-PLAN.md -- Build verification and manual testing in live Obsidian
@@ -111,5 +111,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Foundation | 0/6 | Planning complete | - |
 | 2. Spatial Intelligence | 0/3 | Planning complete | - |
 | 3. Core Generation Loop | 0/5 | Planning complete | - |
-| 4. Multi-Medium Expansion | 0/4 | Planning complete | - |
+| 4. Multi-Medium Expansion | 1/4 | In progress | - |
 | 5. Taste Profile and Polish | 0/0 | Not started | - |

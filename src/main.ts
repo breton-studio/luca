@@ -325,8 +325,15 @@ export default class CanvasAIPlugin extends Plugin {
 
         // Helper: create a node for the given type at the next placement
         const createNodeForType = (meta: TypedNodeMeta): any | null => {
-          if (seenTypes.has(meta.type)) return null; // Duplicate type -- skip per D-02
-          if (seenTypes.size >= 4) return null; // Max 4 nodes total
+          console.log(`[Canvas AI] createNodeForType: type=${meta.type}, lang=${meta.lang ?? 'none'}, seenTypes=[${[...seenTypes].join(',')}]`);
+          if (seenTypes.has(meta.type)) {
+            console.log(`[Canvas AI] SKIP duplicate type: ${meta.type}`);
+            return null;
+          }
+          if (seenTypes.size >= 4) {
+            console.log(`[Canvas AI] SKIP max 4 nodes reached`);
+            return null;
+          }
 
           const size = NODE_SIZES[meta.type] ?? NODE_SIZES.text;
           const placement = placements[placementIndex] ?? { x: 0, y: 0, ...size };
@@ -365,6 +372,7 @@ export default class CanvasAIPlugin extends Plugin {
             onTextUpdate: (text: string, meta: TypedNodeMeta) => {
               // Create node if none is active (first node or after boundary)
               if (!activeNode) {
+                console.log(`[Canvas AI] onTextUpdate: creating node for type=${meta.type}, text preview="${text.substring(0, 50)}..."`);
                 activeNode = createNodeForType(meta);
                 activeNodeMeta = meta;
                 if (!activeNode) return;
@@ -381,6 +389,7 @@ export default class CanvasAIPlugin extends Plugin {
               if (!activeNode) return;
 
               // Route by medium type per D-10, D-11, D-12
+              console.log(`[Canvas AI] onTextUpdate routing: type=${activeNodeMeta?.type}, textLen=${text.length}`);
               if (activeNodeMeta?.type === 'mermaid') {
                 // Buffer mermaid content -- don't flush to node yet (D-10, MMED-04)
                 mermaidBuffer = text;
@@ -398,6 +407,7 @@ export default class CanvasAIPlugin extends Plugin {
             },
 
             onNodeBoundary: (content: string, nodeIndex: number, meta: TypedNodeMeta) => {
+              console.log(`[Canvas AI] onNodeBoundary: nodeIndex=${nodeIndex}, completedType=${activeNodeMeta?.type}, meta.type=${meta.type}, contentLen=${content.length}`);
               // Finalize the current node
               if (activeNode && activeNodeMeta) {
                 this.adapter.removeNodeCssClass(activeNode, 'canvas-ai-node--streaming');
@@ -418,6 +428,7 @@ export default class CanvasAIPlugin extends Plugin {
                   this.suppressEvents(() => this.adapter.updateNodeText(activeNode, content));
                 } else if (activeNodeMeta.type === 'image') {
                   // Fire async Runware request (D-08 -- non-blocking)
+                  console.log(`[Canvas AI] IMAGE: firing Runware generation, prompt="${content.substring(0, 80)}..."`);
                   this.fireImageGeneration(content, activeNode, canvas);
                 }
               }
@@ -483,8 +494,11 @@ export default class CanvasAIPlugin extends Plugin {
    * Swaps the placeholder text node for a file node on success per UI-SPEC.
    */
   private async fireImageGeneration(prompt: string, placeholderNode: any, canvas: any): Promise<void> {
+    console.log(`[Canvas AI] fireImageGeneration: runwareClient=${!!this.runwareClient}, apiKey=${!!this.settings.runwareApiKey}, prompt="${prompt.substring(0, 80)}..."`);
     // Check if Runware client is available
     if (!this.runwareClient || !this.settings.runwareApiKey) {
+      console.log(`[Canvas AI] IMAGE ABORT: no Runware client or API key`);
+
       this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--streaming');
       this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--image-placeholder');
       this.suppressEvents(() => this.adapter.updateNodeText(placeholderNode, 'Image generation failed'));
@@ -494,8 +508,12 @@ export default class CanvasAIPlugin extends Plugin {
 
     try {
       // 1. Call Runware SDK
+      console.log(`[Canvas AI] IMAGE: calling Runware SDK...`);
       const images = await this.runwareClient.generateImage(prompt);
+      console.log(`[Canvas AI] IMAGE: Runware returned, images=${JSON.stringify(images?.map(i => ({ hasBase64: !!i.imageBase64Data, base64Len: i.imageBase64Data?.length })))}`);
       if (!images || images.length === 0 || !images[0].imageBase64Data) {
+        console.log(`[Canvas AI] IMAGE FAIL: no image data returned`);
+
         this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--streaming');
         this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--image-placeholder');
         this.suppressEvents(() => this.adapter.updateNodeText(placeholderNode, 'Image generation failed'));
@@ -504,12 +522,15 @@ export default class CanvasAIPlugin extends Plugin {
       }
 
       // 2. Save image to vault via ImageSaver
+      console.log(`[Canvas AI] IMAGE: saving to vault...`);
       if (!this.imageSaver) {
         this.imageSaver = new ImageSaver(this.app.vault, this.settings.imageSavePath);
       }
       const filePath = await this.imageSaver.saveToVault(images[0].imageBase64Data);
+      console.log(`[Canvas AI] IMAGE: saved to ${filePath}`);
 
       // 3. Swap placeholder text node for file node (UI-SPEC Placeholder-to-File-Node Swap Sequence)
+      console.log(`[Canvas AI] IMAGE: swapping placeholder for file node at ${filePath}`);
       const pos = {
         x: placeholderNode.x,
         y: placeholderNode.y,

@@ -2,7 +2,7 @@ import { Runware } from '@runware/sdk-js';
 
 const RIVERFLOW_MODEL = 'sourceful:riverflow-2.0@pro';
 const DEFAULT_IMAGE_SIZE = 1024;
-const IMAGE_TIMEOUT_MS = 30_000;
+const IMAGE_TIMEOUT_MS = 120_000;
 
 /**
  * Wrapper around the Runware SDK for image generation via Riverflow 2.0 Pro.
@@ -36,7 +36,9 @@ export class RunwareImageClient {
    */
   async generateImage(prompt: string): Promise<Array<{ imageBase64Data?: string }> | undefined> {
     try {
+      console.log('[Canvas AI] Runware: ensuring client connection...');
       const client = await this.ensureClient();
+      console.log('[Canvas AI] Runware: client connected, calling requestImages...');
       const results = await Promise.race([
         client.requestImages({
           positivePrompt: prompt,
@@ -51,6 +53,7 @@ export class RunwareImageClient {
           setTimeout(() => reject(new Error('Runware timeout')), IMAGE_TIMEOUT_MS)
         ),
       ]);
+      console.log('[Canvas AI] Runware: requestImages returned, resultCount=' + (results as any[])?.length);
       return results as Array<{ imageBase64Data?: string }>;
     } catch (err) {
       console.error('[Canvas AI] Runware image generation failed:', err);
@@ -72,7 +75,7 @@ export class RunwareImageClient {
 
   private async ensureClient(): Promise<Runware> {
     if (!this.client) {
-      this.client = new Runware({ apiKey: this.apiKey });
+      this.client = new Runware({ apiKey: this.apiKey, timeoutDuration: IMAGE_TIMEOUT_MS });
       await this.client.ensureConnection();
     }
     return this.client;

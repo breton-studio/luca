@@ -44,7 +44,7 @@ Rules:
 - Use 1-2 nodes for simple contexts, more types for rich/complex contexts
 - Prefer text unless another medium adds clear value
 - Code: use when context is technical -- always include lang attribute
-- Mermaid: use for relationships, flows, hierarchies, sequences
+- Mermaid: use for relationships, flows, hierarchies, sequences. Never use HTML tags like <br/> in mermaid -- use \\n or short labels instead
 - Image: use sparingly -- only when a visual concept is genuinely powerful
 - Each node should contain a distinct idea, not duplicate information across types
 - Never prefix content with labels like "AI:" or "Generated:"
@@ -52,9 +52,10 @@ Rules:
 ## Medium Selection Guidelines
 - Default to text for ideas, analysis, and narrative
 - Add code when the user is working on something technical
-- Add mermaid when relationships/structure would clarify
+- Add mermaid ONLY when the user is explicitly discussing a process, flow, hierarchy, or system with clear relationships between named entities. Do NOT use mermaid for general topics, descriptions, or brainstorming
 - Add image only when a visual would be genuinely impactful
 - Do not generate images unless the spatial context strongly calls for it
+- When in doubt, use fewer node types. A single good text node beats a forced multi-medium response
 
 ## Spatial Awareness
 - Consider the spatial arrangement of nodes when generating

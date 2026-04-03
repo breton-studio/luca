@@ -15,21 +15,21 @@ After any canvas action, Opus reads spatial context and generates relevant multi
 - [x] Opus receives spatial context: node positions, content, and proximity relationships — Validated in Phase 02: spatial-intelligence
 - [x] Proximity interpreted as both "related concepts" and "focus area" — Validated in Phase 02: spatial-intelligence
 - [x] Generated nodes appear with spatial awareness (placed logically, not overlapping) — Validated in Phase 02: spatial-intelligence
+- [x] Plugin hooks into Obsidian canvas events (node create, move, edit, delete) — Validated in Phase 03: core-generation-loop
+- [x] Debounce triggers Opus after ~3s of user idle — Validated in Phase 03: core-generation-loop
+- [x] Auto-generates new text/markdown nodes placed near the action area — Validated in Phase 03: core-generation-loop
+- [x] Streaming/progressive rendering so content appears quickly — Validated in Phase 03: core-generation-loop
+- [x] Global taste profile that defines what the user considers tasteful and how they think — Validated in Phase 03: core-generation-loop
+- [x] Taste profile is editable (settings UI or markdown file) — Validated in Phase 03: core-generation-loop
+- [x] Opus uses the taste profile to shape all generated content — tone, style, depth, aesthetics — Validated in Phase 03: core-generation-loop
 
 ### Active
 
-- [ ] Plugin hooks into Obsidian canvas events (node create, move, edit, delete)
-- [ ] Debounce triggers Opus after ~3s of user idle
-- [ ] Auto-generates new text/markdown nodes placed near the action area
 - [ ] Auto-generates code block nodes when context calls for it
 - [ ] Auto-generates SVG/Mermaid diagram nodes for structured visuals
 - [ ] Auto-generates images via Riverflow 2.0 Pro (Runware API) when visuals are needed
 - [ ] Opus decides which medium type(s) to generate based on context
-- [ ] Streaming/progressive rendering so content appears quickly
 - [ ] Works for a small team (shared configuration, API key management)
-- [ ] Global taste profile that defines what the user considers tasteful and how they think
-- [ ] Taste profile is editable (settings UI or markdown file)
-- [ ] Opus uses the taste profile to shape all generated content — tone, style, depth, aesthetics
 - [ ] Each team member can have their own taste profile
 
 ### Out of Scope
@@ -86,4 +86,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-03 after Phase 02 completion*
+*Last updated: 2026-04-03 after Phase 03 completion*

@@ -23,10 +23,10 @@
 
 ### Spatial Intelligence
 
-- [ ] **SPAT-01**: Plugin reads all node positions, dimensions, and content from active canvas
-- [ ] **SPAT-02**: Proximity graph computed from node positions (Euclidean distance between centers)
-- [ ] **SPAT-03**: Nearby nodes interpreted as conceptually related (proximity-as-semantics)
-- [ ] **SPAT-04**: Distant nodes interpreted as weakly related or tangential
+- [x] **SPAT-01**: Plugin reads all node positions, dimensions, and content from active canvas
+- [x] **SPAT-02**: Proximity graph computed from node positions (Euclidean distance between centers)
+- [x] **SPAT-03**: Nearby nodes interpreted as conceptually related (proximity-as-semantics)
+- [x] **SPAT-04**: Distant nodes interpreted as weakly related or tangential
 - [ ] **SPAT-05**: Dense node clusters detected as focus areas (density-based analysis)
 - [ ] **SPAT-06**: Spatial context serialized into structured narrative for LLM prompt
 - [ ] **SPAT-07**: Only nearby/relevant nodes sent to Claude (not entire canvas) for cost efficiency
@@ -123,10 +123,10 @@
 | FOUN-11 | Phase 1 | Complete |
 | FOUN-12 | Phase 1 | Complete |
 | FOUN-13 | Phase 1 | Complete |
-| SPAT-01 | Phase 2 | Pending |
-| SPAT-02 | Phase 2 | Pending |
-| SPAT-03 | Phase 2 | Pending |
-| SPAT-04 | Phase 2 | Pending |
+| SPAT-01 | Phase 2 | Complete |
+| SPAT-02 | Phase 2 | Complete |
+| SPAT-03 | Phase 2 | Complete |
+| SPAT-04 | Phase 2 | Complete |
 | SPAT-05 | Phase 2 | Pending |
 | SPAT-06 | Phase 2 | Pending |
 | SPAT-07 | Phase 2 | Pending |

@@ -1,0 +1,9 @@
+{
+  "id": "canvas-ai",
+  "name": "Canvas AI",
+  "version": "0.1.0",
+  "minAppVersion": "1.12.0",
+  "description": "AI-powered spatial thinking partner for Obsidian Canvas",
+  "author": "Canvas AI Team",
+  "isDesktopOnly": true
+}

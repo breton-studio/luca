@@ -39,13 +39,13 @@
 - [ ] **GENP-01**: Claude Opus 4.6 called via Anthropic SDK with SSE streaming
 - [ ] **GENP-02**: Streaming uses Node.js fetch in Electron (not Obsidian requestUrl)
 - [ ] **GENP-03**: Text content streams progressively into pre-allocated canvas nodes
-- [ ] **GENP-04**: Streaming updates buffered to 200-300ms intervals to prevent layout thrash
+- [x] **GENP-04**: Streaming updates buffered to 200-300ms intervals to prevent layout thrash
 - [ ] **GENP-05**: Node dimensions pre-allocated before streaming begins
 - [ ] **GENP-06**: System prompt includes spatial context, taste profile, and medium selection instructions
 - [ ] **GENP-07**: Opus decides which medium type(s) to generate based on canvas context
 - [ ] **GENP-08**: Prompt caching enabled for system prompt to reduce input token costs
-- [ ] **GENP-09**: Token budget system with configurable daily/hourly caps
-- [ ] **GENP-10**: Budget exceeded state shown in UI, generation paused until reset
+- [x] **GENP-09**: Token budget system with configurable daily/hourly caps
+- [x] **GENP-10**: Budget exceeded state shown in UI, generation paused until reset
 - [ ] **GENP-11**: Timeout watchdog detects streaming pauses >30s with user-visible feedback
 - [ ] **GENP-12**: API errors handled gracefully (retry with backoff, surface in status bar, never crash canvas)
 
@@ -64,9 +64,9 @@
 
 ### Taste Profile
 
-- [ ] **TAST-01**: Global taste profile stored as markdown or JSON file in vault
-- [ ] **TAST-02**: Taste profile includes fields: thinking style, tone, visual preference, depth
-- [ ] **TAST-03**: Taste profile injected into system prompt for every Claude API call
+- [x] **TAST-01**: Global taste profile stored as markdown or JSON file in vault
+- [x] **TAST-02**: Taste profile includes fields: thinking style, tone, visual preference, depth
+- [x] **TAST-03**: Taste profile injected into system prompt for every Claude API call
 - [ ] **TAST-04**: Per-team-member profiles supported (each user has their own file)
 - [ ] **TAST-05**: Taste profile editable through settings UI or by editing the file directly
 - [ ] **TAST-06**: Structured separation of style (how to communicate) vs substance (what to communicate)
@@ -136,13 +136,13 @@
 | GENP-01 | Phase 3 | Pending |
 | GENP-02 | Phase 3 | Pending |
 | GENP-03 | Phase 3 | Pending |
-| GENP-04 | Phase 3 | Pending |
+| GENP-04 | Phase 3 | Complete |
 | GENP-05 | Phase 3 | Pending |
 | GENP-06 | Phase 3 | Pending |
 | GENP-07 | Phase 3 | Pending |
 | GENP-08 | Phase 3 | Pending |
-| GENP-09 | Phase 3 | Pending |
-| GENP-10 | Phase 3 | Pending |
+| GENP-09 | Phase 3 | Complete |
+| GENP-10 | Phase 3 | Complete |
 | GENP-11 | Phase 3 | Pending |
 | GENP-12 | Phase 3 | Pending |
 | MMED-01 | Phase 3 | Pending |
@@ -155,9 +155,9 @@
 | MMED-08 | Phase 4 | Pending |
 | MMED-09 | Phase 3 | Pending |
 | MMED-10 | Phase 3 | Pending |
-| TAST-01 | Phase 3 | Pending |
-| TAST-02 | Phase 3 | Pending |
-| TAST-03 | Phase 3 | Pending |
+| TAST-01 | Phase 3 | Complete |
+| TAST-02 | Phase 3 | Complete |
+| TAST-03 | Phase 3 | Complete |
 | TAST-04 | Phase 5 | Pending |
 | TAST-05 | Phase 5 | Pending |
 | TAST-06 | Phase 5 | Pending |

@@ -66,7 +66,7 @@ Plans:
   5. Token budget system pauses generation when daily/hourly caps are exceeded, with a clear UI indication
 **Plans**: 5 plans
 Plans:
-- [ ] 03-01-PLAN.md -- Dependencies, types, token budget, taste profile modules
+- [x] 03-01-PLAN.md -- Dependencies, types, token budget, taste profile modules
 - [ ] 03-02-PLAN.md -- Claude client, prompt builder, stream handler
 - [ ] 03-03-PLAN.md -- Canvas write adapter, status bar extension, settings UI, CSS
 - [ ] 03-04-PLAN.md -- Pipeline wiring in main.ts

@@ -323,12 +323,12 @@ export default class CanvasAIPlugin extends Plugin {
               this.setState('streaming');
             },
 
-            onTextUpdate: (text: string) => {
+            onTextUpdate: (text: string, _meta) => {
               this.suppressEvents(() => this.adapter.updateNodeText(currentNode, text));
             },
 
-            onNodeBoundary: () => {
-              // Single-node generation — ignore node boundaries (Phase 4 adds multi-type nodes)
+            onNodeBoundary: (_content, _index, _meta) => {
+              // Single-node generation — ignore node boundaries (Phase 4 Plan 02 adds multi-type routing)
             },
 
             onTimeout: () => {

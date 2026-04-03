@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type CanvasAIPlugin from './main';
+import { TokenUsageData, DEFAULT_TOKEN_USAGE } from './types/settings';
 
 export class CanvasAISettingTab extends PluginSettingTab {
   plugin: CanvasAIPlugin;
@@ -89,6 +90,96 @@ export class CanvasAISettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    // --- Token Budget Section (D-11) ---
+    new Setting(containerEl).setName('Token Budget').setHeading();
+
+    // Daily token limit slider: range 100K-2M, step 100K, default 500K
+    new Setting(containerEl)
+      .setName('Daily token limit')
+      .setDesc('Maximum tokens per day (input + output). Generation pauses when exceeded.')
+      .addSlider((slider) =>
+        slider
+          .setLimits(100000, 2000000, 100000)
+          .setValue(this.plugin.settings.dailyTokenBudget)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.dailyTokenBudget = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    // Today's usage: read-only text display
+    new Setting(containerEl)
+      .setName("Today's usage")
+      .setDesc(this.formatTokenUsage());
+
+    // Override budget toggle
+    new Setting(containerEl)
+      .setName('Override budget')
+      .setDesc('Allow generation for the rest of today even though the budget is exceeded')
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.getTokenUsage().budgetOverride)
+          .onChange(async (value) => {
+            await (this.plugin as any).setBudgetOverride(value);
+          })
+      );
+
+    // --- AI Node Appearance Section (D-05, D-06) ---
+    new Setting(containerEl).setName('AI Node Appearance').setHeading();
+
+    // Node color dropdown: options "1"-"6"
+    new Setting(containerEl)
+      .setName('Node color')
+      .setDesc('Canvas color preset for AI-generated nodes')
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOptions({
+            '1': 'Color 1 (Red)',
+            '2': 'Color 2 (Orange)',
+            '3': 'Color 3 (Yellow)',
+            '4': 'Color 4 (Green)',
+            '5': 'Color 5 (Cyan)',
+            '6': 'Color 6 (Purple)',
+          })
+          .setValue(this.plugin.settings.aiNodeColor.length <= 1 ? this.plugin.settings.aiNodeColor : '6')
+          .onChange(async (value) => {
+            this.plugin.settings.aiNodeColor = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    // --- Taste Profile Section (D-08, D-09, D-10) ---
+    new Setting(containerEl).setName('Taste Profile').setHeading();
+
+    // Profile location: read-only
+    new Setting(containerEl)
+      .setName('Profile location')
+      .setDesc(this.plugin.settings.tasteProfilePath);
+
+    // Edit profile button
+    new Setting(containerEl)
+      .setName('Edit taste profile')
+      .setDesc('Open the taste profile file in the editor')
+      .addButton((button) =>
+        button.setButtonText('Edit profile').onClick(async () => {
+          await (this.plugin as any).openTasteProfile();
+        })
+      );
+
+    // Reset to default button
+    new Setting(containerEl)
+      .setName('Reset taste profile')
+      .setDesc('Reset to the default taste profile')
+      .addButton((button) =>
+        button
+          .setButtonText('Reset to default')
+          .setWarning()
+          .onClick(async () => {
+            await (this.plugin as any).resetTasteProfile();
+          })
+      );
   }
 
   // D-06: Format-only validation per user approval.
@@ -110,6 +201,18 @@ export class CanvasAISettingTab extends PluginSettingTab {
       descEl.addClass('canvas-ai-invalid');
       descEl.removeClass('canvas-ai-valid');
     }
+  }
+
+  private formatTokenUsage(): string {
+    const usage = this.getTokenUsage();
+    const limit = this.plugin.settings.dailyTokenBudget;
+    const total = usage.inputTokens + usage.outputTokens;
+    return `${total.toLocaleString()} / ${limit.toLocaleString()} tokens`;
+  }
+
+  private getTokenUsage(): TokenUsageData {
+    // Read from plugin's token usage (will be wired in Plan 04)
+    return (this.plugin as any).tokenUsage ?? DEFAULT_TOKEN_USAGE;
   }
 
   // D-06: Format-only validation (same rationale as Claude key above).

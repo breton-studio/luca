@@ -30,7 +30,14 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. User can enable/disable the plugin from both the command palette and a status bar indicator
   4. Status bar shows current state (thinking/idle/error) and updates when the user acts on the canvas
   5. Creating, editing, moving, or deleting canvas nodes triggers a debounced idle timer visible in the status bar
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+- [ ] 01-01-PLAN.md -- Project scaffold, build toolchain, settings tab UI
+- [ ] 01-02-PLAN.md -- Canvas Adapter Layer with file-based fallback
+- [ ] 01-03-PLAN.md -- Status bar manager and per-canvas context menu
+- [ ] 01-04-PLAN.md -- Canvas event detection via monkey-patching
+- [ ] 01-05-PLAN.md -- Debounce controller and full event pipeline wiring
+- [ ] 01-06-PLAN.md -- Manual verification in live Obsidian
 
 ### Phase 2: Spatial Intelligence
 **Goal**: The plugin understands canvas layout -- which nodes are near each other, where clusters exist, and where to place new content without overlapping existing nodes
@@ -86,7 +93,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/0 | Not started | - |
+| 1. Foundation | 0/6 | Planning complete | - |
 | 2. Spatial Intelligence | 0/0 | Not started | - |
 | 3. Core Generation Loop | 0/0 | Not started | - |
 | 4. Multi-Medium Expansion | 0/0 | Not started | - |

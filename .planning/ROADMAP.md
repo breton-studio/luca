@@ -48,7 +48,11 @@ Plans:
   2. Nearby nodes are identified as related and distant nodes as weakly related (proximity-as-semantics)
   3. Dense clusters of nodes are detected as focus areas that attract generation placement
   4. Generated node positions are computed without overlapping any existing nodes, accounting for zoom and pan
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 02-01-PLAN.md -- Spatial types, proximity graph, canvas edge reading, test fixtures
+- [ ] 02-02-PLAN.md -- DBSCAN clustering and collision-free orbital placement
+- [ ] 02-03-PLAN.md -- Context builder, narrative serialization, barrel export
 
 ### Phase 3: Core Generation Loop
 **Goal**: After the user acts on the canvas and goes idle, Claude reads spatial context and a taste profile, then streams new text/markdown nodes that appear progressively near the action area -- closing the core value loop
@@ -94,7 +98,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 0/6 | Planning complete | - |
-| 2. Spatial Intelligence | 0/0 | Not started | - |
+| 2. Spatial Intelligence | 0/3 | Planning complete | - |
 | 3. Core Generation Loop | 0/0 | Not started | - |
 | 4. Multi-Medium Expansion | 0/0 | Not started | - |
 | 5. Taste Profile and Polish | 0/0 | Not started | - |

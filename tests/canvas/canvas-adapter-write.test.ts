@@ -11,7 +11,13 @@ function createMockCanvas() {
       nodesMap.set(node.id, node);
       return node;
     }),
+    createFileNode: jest.fn((opts: any) => {
+      const node = createMockNode(opts);
+      nodesMap.set(node.id, node);
+      return node;
+    }),
     addNode: jest.fn(),
+    removeNode: jest.fn(),
     nodes: nodesMap,
     requestSave: jest.fn(),
   };
@@ -188,6 +194,102 @@ describe('CanvasAdapter write methods', () => {
       });
 
       expect(() => adapter.requestCanvasSave(canvas)).not.toThrow();
+    });
+  });
+
+  describe('createFileNodeOnCanvas', () => {
+    it('calls canvas.createFileNode with correct pos, size, file, and focus args', () => {
+      const canvas = createMockCanvas();
+      const position = { x: 100, y: 200, width: 400, height: 400 };
+
+      adapter.createFileNodeOnCanvas(canvas, position, 'canvas-ai-images/2026-04-03_abc12345.png');
+
+      expect(canvas.createFileNode).toHaveBeenCalledWith({
+        pos: { x: 100, y: 200 },
+        size: { width: 400, height: 400 },
+        file: 'canvas-ai-images/2026-04-03_abc12345.png',
+        focus: false,
+      });
+    });
+
+    it('calls node.setData with color when color param is provided', () => {
+      const canvas = createMockCanvas();
+      const position = { x: 0, y: 0, width: 400, height: 400 };
+
+      const node = adapter.createFileNodeOnCanvas(canvas, position, 'img.png', '6');
+
+      expect(node.setData).toHaveBeenCalledWith({ color: '6' });
+    });
+
+    it('does NOT call node.setData when no color param is provided', () => {
+      const canvas = createMockCanvas();
+      const position = { x: 0, y: 0, width: 400, height: 400 };
+
+      const node = adapter.createFileNodeOnCanvas(canvas, position, 'img.png');
+
+      expect(node.setData).not.toHaveBeenCalled();
+    });
+
+    it('calls canvas.addNode if node not already in canvas.nodes', () => {
+      const canvas = createMockCanvas();
+      // Override createFileNode to return a node NOT in the map
+      const node = createMockNode();
+      node.id = 'not-in-map';
+      canvas.createFileNode.mockReturnValue(node);
+
+      adapter.createFileNodeOnCanvas(canvas, { x: 0, y: 0, width: 400, height: 400 }, 'img.png');
+
+      expect(canvas.addNode).toHaveBeenCalledWith(node);
+    });
+
+    it('returns the created node on success', () => {
+      const canvas = createMockCanvas();
+
+      const result = adapter.createFileNodeOnCanvas(canvas, { x: 0, y: 0, width: 400, height: 400 }, 'img.png');
+
+      expect(result).not.toBeNull();
+      expect(result.id).toBe('mock-node-id');
+    });
+
+    it('returns null when canvas.createFileNode throws', () => {
+      const canvas = createMockCanvas();
+      canvas.createFileNode.mockImplementation(() => {
+        throw new Error('internal API error');
+      });
+
+      const result = adapter.createFileNodeOnCanvas(canvas, { x: 0, y: 0, width: 400, height: 400 }, 'img.png');
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null when canvas.createFileNode returns undefined', () => {
+      const canvas = createMockCanvas();
+      canvas.createFileNode.mockReturnValue(undefined);
+
+      const result = adapter.createFileNodeOnCanvas(canvas, { x: 0, y: 0, width: 400, height: 400 }, 'img.png');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('removeNodeFromCanvas', () => {
+    it('calls canvas.removeNode with the node', () => {
+      const canvas = createMockCanvas();
+      const node = createMockNode();
+
+      adapter.removeNodeFromCanvas(canvas, node);
+
+      expect(canvas.removeNode).toHaveBeenCalledWith(node);
+    });
+
+    it('does not throw when canvas.removeNode throws', () => {
+      const canvas = createMockCanvas();
+      canvas.removeNode.mockImplementation(() => {
+        throw new Error('node already removed');
+      });
+      const node = createMockNode();
+
+      expect(() => adapter.removeNodeFromCanvas(canvas, node)).not.toThrow();
     });
   });
 });

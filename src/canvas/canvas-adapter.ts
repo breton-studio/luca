@@ -256,6 +256,69 @@ export class CanvasAdapter {
   }
 
   /**
+   * Create a file node on the canvas at the specified position.
+   * Used for displaying generated images (MMED-07).
+   * Uses internal Canvas API createFileNode.
+   * Parameter shape: { pos, size, file, focus } -- inferred from createTextNode pattern.
+   *
+   * @param canvas - Internal canvas object
+   * @param position - Node position and dimensions
+   * @param filePath - Vault-relative path to the file (e.g., 'canvas-ai-images/2026-04-03_abc12345.png')
+   * @param color - Optional canvas color preset for AI node (MMED-10)
+   * @returns The created node, or null on failure
+   */
+  createFileNodeOnCanvas(
+    canvas: any,
+    position: { x: number; y: number; width: number; height: number },
+    filePath: string,
+    color?: string
+  ): any | null {
+    try {
+      const node = canvas.createFileNode({
+        pos: { x: position.x, y: position.y },
+        size: { width: position.width, height: position.height },
+        file: filePath,
+        focus: false,
+      });
+
+      if (!node) {
+        console.error('CanvasAdapter: createFileNode returned undefined');
+        return null;
+      }
+
+      // Set AI node color if provided (MMED-10)
+      if (color !== undefined) {
+        node.setData({ color });
+      }
+
+      // Defensively add to canvas if createFileNode didn't auto-add
+      if (!canvas.nodes.has(node.id)) {
+        canvas.addNode(node);
+      }
+
+      return node;
+    } catch (e) {
+      console.error('CanvasAdapter: createFileNodeOnCanvas failed (internal API unavailable)', e);
+      return null;
+    }
+  }
+
+  /**
+   * Remove a node from the canvas.
+   * Used during image placeholder-to-file-node swap (MMED-08).
+   *
+   * @param canvas - Internal canvas object
+   * @param node - The node to remove
+   */
+  removeNodeFromCanvas(canvas: any, node: any): void {
+    try {
+      canvas.removeNode(node);
+    } catch {
+      // Silently catch -- node may already be removed
+    }
+  }
+
+  /**
    * FALLBACK (FOUN-03): Read canvas data from file when internal API is unavailable.
    * Used when: canvas view is not active, internal API breaks, or batch reading.
    */

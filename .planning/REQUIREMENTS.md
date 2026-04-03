@@ -55,10 +55,10 @@
 - [ ] **MMED-02**: Code block nodes generated with language-tagged fenced code blocks
 - [ ] **MMED-03**: Mermaid diagram nodes generated using Obsidian's built-in Mermaid renderer
 - [ ] **MMED-04**: Mermaid rendering buffered until diagram is complete (no mid-stream render)
-- [ ] **MMED-05**: Image generation triggered via Runware API with Riverflow 2.0 Pro model
-- [ ] **MMED-06**: Opus generates image prompts, Runware renders the image
-- [ ] **MMED-07**: Generated images saved to vault and displayed as file nodes on canvas
-- [ ] **MMED-08**: Image generation loading state visible (placeholder node while generating)
+- [x] **MMED-05**: Image generation triggered via Runware API with Riverflow 2.0 Pro model
+- [x] **MMED-06**: Opus generates image prompts, Runware renders the image
+- [x] **MMED-07**: Generated images saved to vault and displayed as file nodes on canvas
+- [x] **MMED-08**: Image generation loading state visible (placeholder node while generating)
 - [x] **MMED-09**: Each medium type has appropriate node sizing (code wider, images square, etc.)
 - [x] **MMED-10**: AI-generated nodes visually distinguishable from user-created nodes (color/label)
 
@@ -149,10 +149,10 @@
 | MMED-02 | Phase 4 | Pending |
 | MMED-03 | Phase 4 | Pending |
 | MMED-04 | Phase 4 | Pending |
-| MMED-05 | Phase 4 | Pending |
-| MMED-06 | Phase 4 | Pending |
-| MMED-07 | Phase 4 | Pending |
-| MMED-08 | Phase 4 | Pending |
+| MMED-05 | Phase 4 | Complete |
+| MMED-06 | Phase 4 | Complete |
+| MMED-07 | Phase 4 | Complete |
+| MMED-08 | Phase 4 | Complete |
 | MMED-09 | Phase 3 | Complete |
 | MMED-10 | Phase 3 | Complete |
 | TAST-01 | Phase 3 | Complete |

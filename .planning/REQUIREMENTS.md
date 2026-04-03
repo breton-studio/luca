@@ -38,9 +38,9 @@
 
 - [ ] **GENP-01**: Claude Opus 4.6 called via Anthropic SDK with SSE streaming
 - [ ] **GENP-02**: Streaming uses Node.js fetch in Electron (not Obsidian requestUrl)
-- [ ] **GENP-03**: Text content streams progressively into pre-allocated canvas nodes
+- [x] **GENP-03**: Text content streams progressively into pre-allocated canvas nodes
 - [x] **GENP-04**: Streaming updates buffered to 200-300ms intervals to prevent layout thrash
-- [ ] **GENP-05**: Node dimensions pre-allocated before streaming begins
+- [x] **GENP-05**: Node dimensions pre-allocated before streaming begins
 - [ ] **GENP-06**: System prompt includes spatial context, taste profile, and medium selection instructions
 - [ ] **GENP-07**: Opus decides which medium type(s) to generate based on canvas context
 - [ ] **GENP-08**: Prompt caching enabled for system prompt to reduce input token costs
@@ -59,8 +59,8 @@
 - [ ] **MMED-06**: Opus generates image prompts, Runware renders the image
 - [ ] **MMED-07**: Generated images saved to vault and displayed as file nodes on canvas
 - [ ] **MMED-08**: Image generation loading state visible (placeholder node while generating)
-- [ ] **MMED-09**: Each medium type has appropriate node sizing (code wider, images square, etc.)
-- [ ] **MMED-10**: AI-generated nodes visually distinguishable from user-created nodes (color/label)
+- [x] **MMED-09**: Each medium type has appropriate node sizing (code wider, images square, etc.)
+- [x] **MMED-10**: AI-generated nodes visually distinguishable from user-created nodes (color/label)
 
 ### Taste Profile
 
@@ -135,9 +135,9 @@
 | SPAT-10 | Phase 2 | Complete |
 | GENP-01 | Phase 3 | Pending |
 | GENP-02 | Phase 3 | Pending |
-| GENP-03 | Phase 3 | Pending |
+| GENP-03 | Phase 3 | Complete |
 | GENP-04 | Phase 3 | Complete |
-| GENP-05 | Phase 3 | Pending |
+| GENP-05 | Phase 3 | Complete |
 | GENP-06 | Phase 3 | Pending |
 | GENP-07 | Phase 3 | Pending |
 | GENP-08 | Phase 3 | Pending |
@@ -153,8 +153,8 @@
 | MMED-06 | Phase 4 | Pending |
 | MMED-07 | Phase 4 | Pending |
 | MMED-08 | Phase 4 | Pending |
-| MMED-09 | Phase 3 | Pending |
-| MMED-10 | Phase 3 | Pending |
+| MMED-09 | Phase 3 | Complete |
+| MMED-10 | Phase 3 | Complete |
 | TAST-01 | Phase 3 | Complete |
 | TAST-02 | Phase 3 | Complete |
 | TAST-03 | Phase 3 | Complete |

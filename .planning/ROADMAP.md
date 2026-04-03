@@ -51,7 +51,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 02-01-PLAN.md -- Spatial types, proximity graph, canvas edge reading, test fixtures
-- [ ] 02-02-PLAN.md -- DBSCAN clustering and collision-free orbital placement
+- [x] 02-02-PLAN.md -- DBSCAN clustering and collision-free orbital placement
 - [ ] 02-03-PLAN.md -- Context builder, narrative serialization, barrel export
 
 ### Phase 3: Core Generation Loop

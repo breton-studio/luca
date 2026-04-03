@@ -82,7 +82,12 @@ Plans:
   3. Images generated via Runware/Riverflow 2.0 Pro appear as file nodes on the canvas with a loading placeholder during generation
   4. Claude autonomously chooses the appropriate medium type(s) for each generation based on spatial context
   5. Each generation produces at most one node per content type (1 text + 1 code + 1 diagram + 1 image max) — no duplicate types
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+- [x] 04-01-PLAN.md -- Typed node tag parsing in stream handler
+- [ ] 04-02-PLAN.md -- Medium-specific rendering and pipeline routing
+- [ ] 04-03-PLAN.md -- Runware image generation client and canvas file nodes
+- [ ] 04-04-PLAN.md -- Multi-medium prompt builder and build verification
 
 ### Phase 5: Taste Profile and Polish
 **Goal**: Each team member has their own taste profile that shapes AI output to match their thinking style, with safeguards against sycophantic flattening of novelty
@@ -106,5 +111,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Foundation | 0/6 | Planning complete | - |
 | 2. Spatial Intelligence | 0/3 | Planning complete | - |
 | 3. Core Generation Loop | 0/5 | Planning complete | - |
-| 4. Multi-Medium Expansion | 0/0 | Not started | - |
+| 4. Multi-Medium Expansion | 1/4 | In progress | - |
 | 5. Taste Profile and Polish | 0/0 | Not started | - |

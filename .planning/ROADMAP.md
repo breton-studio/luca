@@ -64,8 +64,13 @@ Plans:
   3. Content streams progressively into pre-sized nodes without layout thrash or overlapping
   4. A global taste profile (markdown file in vault) shapes the tone, style, and depth of all generated content
   5. Token budget system pauses generation when daily/hourly caps are exceeded, with a clear UI indication
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 5 plans
+Plans:
+- [ ] 03-01-PLAN.md -- Dependencies, types, token budget, taste profile modules
+- [ ] 03-02-PLAN.md -- Claude client, prompt builder, stream handler
+- [ ] 03-03-PLAN.md -- Canvas write adapter, status bar extension, settings UI, CSS
+- [ ] 03-04-PLAN.md -- Pipeline wiring in main.ts
+- [ ] 03-05-PLAN.md -- Build verification and manual testing in live Obsidian
 
 ### Phase 4: Multi-Medium Expansion
 **Goal**: Claude decides whether to generate code blocks, Mermaid diagrams, or images based on canvas context, and each medium type renders correctly on the canvas
@@ -99,6 +104,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 |-------|----------------|--------|-----------|
 | 1. Foundation | 0/6 | Planning complete | - |
 | 2. Spatial Intelligence | 0/3 | Planning complete | - |
-| 3. Core Generation Loop | 0/0 | Not started | - |
+| 3. Core Generation Loop | 0/5 | Planning complete | - |
 | 4. Multi-Medium Expansion | 0/0 | Not started | - |
 | 5. Taste Profile and Polish | 0/0 | Not started | - |

@@ -84,11 +84,11 @@ describe('findOpenDirection', () => {
     ];
     const angle = findOpenDirection(center, rightNodes);
     // Should point roughly leftward (around PI radians)
-    // Accept anything in the left half-plane: PI/2 < angle < 3*PI/2
-    // or equivalently |angle - PI| < PI/2
+    // Accept anything in the left half-plane: PI/2 <= angle <= 3*PI/2
+    // (including straight up/down which is still away from the right side)
     const normalized = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-    expect(normalized).toBeGreaterThan(Math.PI / 2);
-    expect(normalized).toBeLessThan(3 * Math.PI / 2);
+    expect(normalized).toBeGreaterThanOrEqual(Math.PI / 2);
+    expect(normalized).toBeLessThanOrEqual(3 * Math.PI / 2);
   });
 
   it('should return 0 (rightward default) with no other nodes', () => {

@@ -74,6 +74,11 @@ An Obsidian plugin that integrates Claude Opus 4.6 into the canvas as a spatial 
 ### 3. Image Storage: Vault files, not inline base64
 ### 4. Diagram Generation: Mermaid code blocks in text nodes
 ### 5. Taste Profile: Markdown file in vault
+### 6. Generation: One node per content type, edit-mode gated
+- **One per type:** Each generation produces max 1 text node. Phase 4 adds 1 code + 1 diagram + 1 image — each must be a distinct type, never duplicated.
+- **Edit-mode gate:** Generation only triggers after user clicks out of a node (`isEditing=false`). No mid-thought interruption.
+- **AI node isolation:** AI-created node IDs are tracked. Interactions with AI nodes (click, select, focus) never trigger new generation.
+- **Blank node skip:** Empty/whitespace-only trigger nodes are ignored.
 ## Alternatives Considered
 | Category | Recommended | Alternative | Why Not |
 |----------|-------------|-------------|---------|

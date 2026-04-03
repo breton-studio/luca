@@ -32,6 +32,10 @@ export default class CanvasAIPlugin extends Plugin {
   tokenUsage: TokenUsageData = { ...DEFAULT_TOKEN_USAGE };
   /** When true, canvas events from AI operations are suppressed to prevent feedback loops */
   _suppressCanvasEvents = false;
+  /** Hash of canvas state at last generation — skip generation if nothing changed (e.g., click/select) */
+  private lastCanvasHash = '';
+  /** IDs of nodes created by AI — interactions with these don't trigger new generation */
+  private aiNodeIds = new Set<string>();
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -121,6 +125,15 @@ export default class CanvasAIPlugin extends Plugin {
       // Only process if API key is configured
       if (!this.settings.claudeApiKey) return;
       if (this._suppressCanvasEvents) return;
+      // Skip if any node is being actively edited (user still typing)
+      const canvas = this.adapter.getActiveCanvas();
+      if (canvas && this.isAnyNodeBeingEdited(canvas)) return;
+      // Skip if the focused/selected node is AI-generated
+      if (canvas?.nodes) {
+        for (const node of canvas.nodes.values()) {
+          if (node.isFocused && this.aiNodeIds.has(node.id)) return;
+        }
+      }
       this.generationController?.handleCanvasEvent(event.nodeId);
     };
 
@@ -151,6 +164,20 @@ export default class CanvasAIPlugin extends Plugin {
     this._suppressCanvasEvents = true;
     try { return fn(); }
     finally { this._suppressCanvasEvents = false; }
+  }
+
+  /** Check if any canvas node is currently in edit mode (user has cursor active) */
+  private isAnyNodeBeingEdited(canvas: any): boolean {
+    if (!canvas?.nodes) return false;
+    for (const node of canvas.nodes.values()) {
+      if (node.isEditing) return true;
+    }
+    return false;
+  }
+
+  /** Compute a fingerprint of canvas state to detect actual content changes */
+  private computeCanvasHash(nodes: { id: string; x: number; y: number; content: string }[]): string {
+    return nodes.map(n => `${n.id}:${n.x},${n.y}:${n.content}`).sort().join('|');
   }
 
   // ─── Generation Pipeline (GENP-01 through GENP-12) ───────────────
@@ -185,11 +212,20 @@ export default class CanvasAIPlugin extends Plugin {
       const nodes = this.adapter.getNodesFromCanvas(canvas);
       if (nodes.length === 0) return; // Empty canvas, nothing to generate from
 
+      // Skip generation if canvas content hasn't changed (e.g., click/select, not an edit)
+      const canvasHash = this.computeCanvasHash(nodes);
+      if (canvasHash === this.lastCanvasHash) return;
+
       const edges = this.adapter.getEdgesFromCanvas(canvas);
 
       // 4. Determine trigger node (use provided ID or fallback to first node)
       const effectiveTriggerNodeId = triggerNodeId ?? nodes[0]?.id;
       if (!effectiveTriggerNodeId) return;
+
+      // Skip generation if trigger node is AI-generated or blank
+      if (this.aiNodeIds.has(effectiveTriggerNodeId)) return;
+      const triggerNode = nodes.find(n => n.id === effectiveTriggerNodeId);
+      if (triggerNode && !triggerNode.content.trim()) return;
 
       // 5. Build spatial context (Phase 2)
       const spatialCtx = buildSpatialContext(nodes, edges, effectiveTriggerNodeId);
@@ -222,7 +258,11 @@ export default class CanvasAIPlugin extends Plugin {
       this.tokenUsage = trackTokens(this.tokenUsage, result.usage);
       await this.persistTokenUsage();
 
-      // 11. Done
+      // 11. Snapshot canvas state (including new AI nodes) to prevent re-trigger on click
+      const postNodes = this.adapter.getNodesFromCanvas(canvas);
+      if (postNodes.length > 0) this.lastCanvasHash = this.computeCanvasHash(postNodes);
+
+      // 12. Done
       this.setState('idle');
 
     } catch (err) {
@@ -253,9 +293,10 @@ export default class CanvasAIPlugin extends Plugin {
 
     while (attempt <= 3) {
       try {
-        // Pre-allocate the first node (D-01, GENP-05, MMED-09)
+        // Pre-allocate a single node (D-01, GENP-05, MMED-09)
+        // One text node per generation — Phase 4 adds distinct types (code, diagram, image)
         const firstPlacement = placements[0] ?? { x: 0, y: 0, width: 300, height: 200 };
-        let currentNode = this.suppressEvents(() =>
+        const currentNode = this.suppressEvents(() =>
           this.adapter.createTextNodeOnCanvas(canvas, firstPlacement, this.settings.aiNodeColor)
         );
 
@@ -264,16 +305,13 @@ export default class CanvasAIPlugin extends Plugin {
           return null;
         }
 
+        // Track as AI node to prevent re-triggering
+        if (currentNode.id) this.aiNodeIds.add(currentNode.id);
+
         // Add pulsing animation (D-04)
         this.adapter.addNodeCssClass(currentNode, 'canvas-ai-node--streaming');
 
-        // Track the active node for onTextUpdate redirection (D-03).
-        // This mutable reference is captured by the callbacks below.
-        // When onNodeBoundary fires, we update it so subsequent
-        // onTextUpdate calls write to the NEW node.
-        let activeNode = currentNode;
-
-        // Stream with sequential multi-node support via onNodeBoundary (D-03)
+        // Stream into the single node
         const result = await streamIntoNode(
           this.claudeClient!,
           systemPrompt,
@@ -281,45 +319,16 @@ export default class CanvasAIPlugin extends Plugin {
           signal,
           {
             onFirstToken: () => {
-              // First token arrived -- stop pulsing on first node, set streaming state
-              this.adapter.removeNodeCssClass(activeNode, 'canvas-ai-node--streaming');
+              this.adapter.removeNodeCssClass(currentNode, 'canvas-ai-node--streaming');
               this.setState('streaming');
             },
 
             onTextUpdate: (text: string) => {
-              // text = current node's visible content only (tags stripped by stream handler)
-              // activeNode is updated by onNodeBoundary, so this always writes to the correct node
-              this.suppressEvents(() => this.adapter.updateNodeText(activeNode, text));
+              this.suppressEvents(() => this.adapter.updateNodeText(currentNode, text));
             },
 
-            onNodeBoundary: (completedNodeContent: string, nodeIndex: number) => {
-              // A </node> boundary was detected mid-stream (D-03).
-              // 1. Finalize the current node with its complete content
-              this.suppressEvents(() => {
-                this.adapter.updateNodeText(activeNode, completedNodeContent);
-                this.adapter.removeNodeCssClass(activeNode, 'canvas-ai-node--streaming');
-                this.adapter.requestCanvasSave(canvas);
-              });
-
-              // 2. Create the next node if we haven't hit the 3-node cap (D-02)
-              const nextIndex = nodeIndex + 1;
-              if (nextIndex < 3 && !signal.aborted) {
-                const nextPlacement = placements[nextIndex] ?? {
-                  x: firstPlacement.x + (nextIndex * 340),
-                  y: firstPlacement.y,
-                  width: 300,
-                  height: 200,
-                };
-                const nextNode = this.suppressEvents(() =>
-                  this.adapter.createTextNodeOnCanvas(canvas, nextPlacement, this.settings.aiNodeColor)
-                );
-                if (nextNode) {
-                  // Add pulsing to the new node
-                  this.adapter.addNodeCssClass(nextNode, 'canvas-ai-node--streaming');
-                  // Redirect subsequent onTextUpdate calls to the new node
-                  activeNode = nextNode;
-                }
-              }
+            onNodeBoundary: () => {
+              // Single-node generation — ignore node boundaries (Phase 4 adds multi-type nodes)
             },
 
             onTimeout: () => {
@@ -328,16 +337,13 @@ export default class CanvasAIPlugin extends Plugin {
           }
         );
 
-        // Finalize the last active node
-        this.adapter.removeNodeCssClass(activeNode, 'canvas-ai-node--streaming');
-
-        // Ensure the last node has its correct final content from parseNodeContent.
-        // The final </node> may or may not have been processed by onNodeBoundary
-        // depending on trailing content.
+        // Finalize node with complete content
+        this.adapter.removeNodeCssClass(currentNode, 'canvas-ai-node--streaming');
         const finalContents = result.nodeContents;
         if (finalContents.length > 0) {
-          const lastContent = finalContents[finalContents.length - 1];
-          this.suppressEvents(() => this.adapter.updateNodeText(activeNode, lastContent));
+          this.suppressEvents(() =>
+            this.adapter.updateNodeText(currentNode, finalContents.join('\n\n'))
+          );
         }
 
         this.suppressEvents(() => this.adapter.requestCanvasSave(canvas));

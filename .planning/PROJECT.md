@@ -67,6 +67,9 @@ After any canvas action, Opus reads spatial context and generates relevant multi
 | Opus decides medium type based on context | More natural than forcing user to specify output type | -- Pending |
 | Proximity = relationship + focus signal | Richer spatial interpretation enables better generation | -- Pending |
 | Taste profile shapes all generation | Users think differently — generated content should reflect the user's sensibility, not generic AI output | -- Pending |
+| Max one node per content type per generation | Prevents overwhelming the canvas. Each generation produces at most 1 text node + optionally 1 code + 1 diagram + 1 image — each must be a distinct type. No duplicate types. | Implemented Phase 3 (text-only cap); Phase 4 adds multi-type |
+| AI nodes don't trigger generation | Interactions with AI-generated nodes (click, select, focus) are ignored by the debounce system. Only user-created content triggers the loop. | Implemented Phase 3 |
+| Generation requires edit-mode exit | Debounce only starts after user clicks out of a node (isEditing=false). Prevents mid-thought interruption. | Implemented Phase 3 |
 
 ## Evolution
 

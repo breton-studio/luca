@@ -73,7 +73,7 @@ Plans:
 - [x] 03-05-PLAN.md -- Build verification and manual testing in live Obsidian
 
 ### Phase 4: Multi-Medium Expansion
-**Goal**: Claude decides whether to generate code blocks, Mermaid diagrams, or images based on canvas context, and each medium type renders correctly on the canvas
+**Goal**: Claude decides whether to generate code blocks, Mermaid diagrams, or images based on canvas context, with max one node per content type per generation — each medium is distinct, never duplicated
 **Depends on**: Phase 3
 **Requirements**: MMED-02, MMED-03, MMED-04, MMED-05, MMED-06, MMED-07, MMED-08
 **Success Criteria** (what must be TRUE):
@@ -81,6 +81,7 @@ Plans:
   2. Mermaid diagrams render using Obsidian's built-in renderer, buffered until the diagram is complete
   3. Images generated via Runware/Riverflow 2.0 Pro appear as file nodes on the canvas with a loading placeholder during generation
   4. Claude autonomously chooses the appropriate medium type(s) for each generation based on spatial context
+  5. Each generation produces at most one node per content type (1 text + 1 code + 1 diagram + 1 image max) — no duplicate types
 **Plans**: TBD
 
 ### Phase 5: Taste Profile and Polish

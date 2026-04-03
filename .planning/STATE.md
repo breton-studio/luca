@@ -98,6 +98,13 @@ Recent decisions affecting current work:
 - [Phase 02]: Trigger node always included at relevance 1.0 regardless of threshold -- anchor for spatial context
 - [Phase 02]: Content truncated to 100 chars for focus/relevant, 50 chars for peripheral -- controls prompt token cost
 - [Phase 02]: Barrel export provides single import path for Phase 3: import { buildSpatialContext } from '../spatial'
+- [Phase 03]: Max one node per content type per generation -- prevents canvas overwhelm. 1 text + optionally 1 code/diagram/image each
+- [Phase 03]: AI node IDs tracked in Set -- interactions with AI nodes don't trigger new generation
+- [Phase 03]: Generation requires edit-mode exit (node.isEditing=false) -- prevents mid-thought interruption
+- [Phase 03]: Blank trigger nodes skip generation -- creating empty nodes doesn't fire Claude API
+- [Phase 03]: suppressEvents() wraps all AI canvas writes -- synchronous flag prevents event feedback loops
+- [Phase 03]: Canvas hash fingerprint skips generation when content unchanged (click/select vs real edit)
+- [Phase 02]: Barrel export provides single import path for Phase 3: import { buildSpatialContext } from '../spatial'
 - [Phase 03]: _internals object pattern for mocking getTodayDateString -- avoids module-scope binding issues with jest.spyOn
 - [Phase 03]: Simple string splitting for YAML frontmatter -- no yaml library dependency for well-defined 4-field format
 - [Phase 03]: Adapter interface pattern for vault I/O in taste profile -- enables pure unit tests without Obsidian mocks

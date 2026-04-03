@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. Creating, editing, moving, or deleting canvas nodes triggers a debounced idle timer visible in the status bar
 **Plans**: 6 plans
 Plans:
-- [ ] 01-01-PLAN.md -- Project scaffold, build toolchain, settings tab UI
+- [x] 01-01-PLAN.md -- Project scaffold, build toolchain, settings tab UI
 - [ ] 01-02-PLAN.md -- Canvas Adapter Layer with file-based fallback
 - [ ] 01-03-PLAN.md -- Status bar manager and per-canvas context menu
 - [ ] 01-04-PLAN.md -- Canvas event detection via monkey-patching

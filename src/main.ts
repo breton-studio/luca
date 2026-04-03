@@ -20,6 +20,17 @@ import { isBudgetExceeded, trackTokens, getOrResetUsage } from './ai/token-budge
 import { readTasteProfile, seedTasteProfile, formatTasteForPrompt, DEFAULT_TASTE_PROFILE } from './taste/taste-profile';
 import { buildSpatialContext } from './spatial';
 import type { PlacementCoordinate } from './spatial';
+import type { TypedNodeMeta } from './types/generation';
+import { RunwareImageClient } from './image/runware-client';
+import { ImageSaver } from './image/image-saver';
+
+/** Node dimensions by medium type per UI-SPEC and MMED-09 */
+const NODE_SIZES: Record<string, { width: number; height: number }> = {
+  text: { width: 300, height: 200 },
+  code: { width: 400, height: 250 },
+  mermaid: { width: 400, height: 300 },
+  image: { width: 512, height: 512 },
+};
 
 export default class CanvasAIPlugin extends Plugin {
   settings!: CanvasAISettings;
@@ -36,6 +47,10 @@ export default class CanvasAIPlugin extends Plugin {
   private lastCanvasHash = '';
   /** IDs of nodes created by AI — interactions with these don't trigger new generation */
   private aiNodeIds = new Set<string>();
+  /** Runware client for image generation (Phase 4, D-08) */
+  private runwareClient: RunwareImageClient | null = null;
+  /** Image saver for persisting generated images to vault (Phase 4, D-07) */
+  private imageSaver: ImageSaver | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -47,6 +62,12 @@ export default class CanvasAIPlugin extends Plugin {
     if (this.settings.claudeApiKey) {
       this.claudeClient = createClaudeClient(this.settings.claudeApiKey);
     }
+
+    // Initialize image generation modules (lazy -- Runware connects on first use per Pitfall 7)
+    if (this.settings.runwareApiKey) {
+      this.runwareClient = new RunwareImageClient(this.settings.runwareApiKey);
+    }
+    this.imageSaver = new ImageSaver(this.app.vault, this.settings.imageSavePath);
 
     // Seed taste profile on first run (TAST-01)
     seedTasteProfile(this.app.vault.adapter, this.settings.tasteProfilePath).catch(console.error);
@@ -147,6 +168,7 @@ export default class CanvasAIPlugin extends Plugin {
 
   onunload(): void {
     this.generationController?.destroy();
+    this.runwareClient?.disconnect();
   }
 
   /**
@@ -274,13 +296,14 @@ export default class CanvasAIPlugin extends Plugin {
   }
 
   /**
-   * Stream a Claude response with retry logic and sequential multi-node support.
+   * Stream a Claude response with retry logic and multi-medium routing.
    *
-   * Key design for D-03 compliance: uses the onNodeBoundary callback from the
-   * stream handler. When </node> is detected mid-stream, the callback fires and
-   * we finalize the current node (remove pulsing, save) and create the next node
-   * (with pulsing). Subsequent onTextUpdate calls from the stream handler contain
-   * the new node's content, which we redirect to the newly created canvas node.
+   * Phase 4 multi-medium pipeline (D-01 through D-12):
+   * - Deferred node creation: nodes created on first onTextUpdate (correct type/size)
+   * - One-per-type enforcement: Set<string> tracks seen types, duplicates skipped (D-02)
+   * - Text/code: progressive streaming into canvas nodes
+   * - Mermaid: buffered until </node> boundary, then flushed as complete diagram (D-10)
+   * - Image: placeholder with "Generating image...", async Runware request on boundary (D-08)
    */
   private async streamWithRetry(
     canvas: any,
@@ -293,25 +316,42 @@ export default class CanvasAIPlugin extends Plugin {
 
     while (attempt <= 3) {
       try {
-        // Pre-allocate a single node (D-01, GENP-05, MMED-09)
-        // One text node per generation — Phase 4 adds distinct types (code, diagram, image)
-        const firstPlacement = placements[0] ?? { x: 0, y: 0, width: 300, height: 200 };
-        const currentNode = this.suppressEvents(() =>
-          this.adapter.createTextNodeOnCanvas(canvas, firstPlacement, this.settings.aiNodeColor)
-        );
+        let activeNode: any = null;
+        let activeNodeMeta: TypedNodeMeta | null = null;
+        let placementIndex = 0;
+        const seenTypes = new Set<string>();
+        let mermaidBuffer = '';
+        let isBufferingMermaid = false;
 
-        if (!currentNode) {
-          new Notice('Canvas AI: Failed to create canvas node.');
-          return null;
-        }
+        // Helper: create a node for the given type at the next placement
+        const createNodeForType = (meta: TypedNodeMeta): any | null => {
+          if (seenTypes.has(meta.type)) return null; // Duplicate type -- skip per D-02
+          if (seenTypes.size >= 4) return null; // Max 4 nodes total
 
-        // Track as AI node to prevent re-triggering
-        if (currentNode.id) this.aiNodeIds.add(currentNode.id);
+          const size = NODE_SIZES[meta.type] ?? NODE_SIZES.text;
+          const placement = placements[placementIndex] ?? { x: 0, y: 0, ...size };
+          // Override width/height from NODE_SIZES for correct medium sizing
+          const position = { x: placement.x, y: placement.y, width: size.width, height: size.height };
+          placementIndex++;
 
-        // Add pulsing animation (D-04)
-        this.adapter.addNodeCssClass(currentNode, 'canvas-ai-node--streaming');
+          const node = this.suppressEvents(() =>
+            this.adapter.createTextNodeOnCanvas(canvas, position, this.settings.aiNodeColor)
+          );
+          if (!node) return null;
 
-        // Stream into the single node
+          if (node.id) this.aiNodeIds.add(node.id);
+          this.adapter.addNodeCssClass(node, 'canvas-ai-node--streaming');
+          seenTypes.add(meta.type);
+
+          // Image placeholder: set text and add CSS class per D-06
+          if (meta.type === 'image') {
+            this.adapter.addNodeCssClass(node, 'canvas-ai-node--image-placeholder');
+            this.suppressEvents(() => this.adapter.updateNodeText(node, 'Generating image...'));
+          }
+
+          return node;
+        };
+
         const result = await streamIntoNode(
           this.claudeClient!,
           systemPrompt,
@@ -319,16 +359,72 @@ export default class CanvasAIPlugin extends Plugin {
           signal,
           {
             onFirstToken: () => {
-              this.adapter.removeNodeCssClass(currentNode, 'canvas-ai-node--streaming');
               this.setState('streaming');
             },
 
-            onTextUpdate: (text: string, _meta) => {
-              this.suppressEvents(() => this.adapter.updateNodeText(currentNode, text));
+            onTextUpdate: (text: string, meta: TypedNodeMeta) => {
+              // Create node if none is active (first node or after boundary)
+              if (!activeNode) {
+                activeNode = createNodeForType(meta);
+                activeNodeMeta = meta;
+                if (!activeNode) return;
+                // Remove pulsing for text/code (content arriving); keep for mermaid/image
+                if (meta.type === 'text' || meta.type === 'code') {
+                  this.adapter.removeNodeCssClass(activeNode, 'canvas-ai-node--streaming');
+                }
+                if (meta.type === 'mermaid') {
+                  mermaidBuffer = '';
+                  isBufferingMermaid = true;
+                }
+              }
+
+              if (!activeNode) return;
+
+              // Route by medium type per D-10, D-11, D-12
+              if (activeNodeMeta?.type === 'mermaid') {
+                // Buffer mermaid content -- don't flush to node yet (D-10, MMED-04)
+                mermaidBuffer = text;
+                isBufferingMermaid = true;
+              } else if (activeNodeMeta?.type === 'code') {
+                // Progressive streaming with fenced code block wrapper (D-12)
+                const lang = activeNodeMeta.lang ?? '';
+                const wrappedCode = '```' + lang + '\n' + text + '\n```';
+                this.suppressEvents(() => this.adapter.updateNodeText(activeNode, wrappedCode));
+              } else if (activeNodeMeta?.type === 'text') {
+                // Progressive streaming (same as Phase 3)
+                this.suppressEvents(() => this.adapter.updateNodeText(activeNode, text));
+              }
+              // type === 'image': no text updates -- placeholder stays as "Generating image..."
             },
 
-            onNodeBoundary: (_content, _index, _meta) => {
-              // Single-node generation — ignore node boundaries (Phase 4 Plan 02 adds multi-type routing)
+            onNodeBoundary: (content: string, nodeIndex: number, meta: TypedNodeMeta) => {
+              // Finalize the current node
+              if (activeNode && activeNodeMeta) {
+                this.adapter.removeNodeCssClass(activeNode, 'canvas-ai-node--streaming');
+
+                if (activeNodeMeta.type === 'mermaid') {
+                  // Flush complete mermaid block (D-10, MMED-04)
+                  const mermaidBlock = '```mermaid\n' + (mermaidBuffer || content) + '\n```';
+                  this.suppressEvents(() => this.adapter.updateNodeText(activeNode, mermaidBlock));
+                  mermaidBuffer = '';
+                  isBufferingMermaid = false;
+                } else if (activeNodeMeta.type === 'code') {
+                  // Final flush with complete code
+                  const lang = activeNodeMeta.lang ?? '';
+                  const wrappedCode = '```' + lang + '\n' + content + '\n```';
+                  this.suppressEvents(() => this.adapter.updateNodeText(activeNode, wrappedCode));
+                } else if (activeNodeMeta.type === 'text') {
+                  // Final flush with complete content
+                  this.suppressEvents(() => this.adapter.updateNodeText(activeNode, content));
+                } else if (activeNodeMeta.type === 'image') {
+                  // Fire async Runware request (D-08 -- non-blocking)
+                  this.fireImageGeneration(content, activeNode, canvas);
+                }
+              }
+
+              // Reset activeNode -- next onTextUpdate will create the new node
+              activeNode = null;
+              activeNodeMeta = null;
             },
 
             onTimeout: () => {
@@ -337,17 +433,18 @@ export default class CanvasAIPlugin extends Plugin {
           }
         );
 
-        // Finalize node with complete content
-        this.adapter.removeNodeCssClass(currentNode, 'canvas-ai-node--streaming');
-        const finalContents = result.nodeContents;
-        if (finalContents.length > 0) {
-          this.suppressEvents(() =>
-            this.adapter.updateNodeText(currentNode, finalContents.join('\n\n'))
-          );
+        // Handle stream completion -- finalize any remaining active node
+        if (activeNode && activeNodeMeta) {
+          this.adapter.removeNodeCssClass(activeNode, 'canvas-ai-node--streaming');
+
+          if (activeNodeMeta.type === 'mermaid' && isBufferingMermaid) {
+            // Stream ended without closing tag -- flush partial with incomplete marker
+            const mermaidBlock = '```mermaid\n' + mermaidBuffer + '\n%% (incomplete -- generation was interrupted)\n```';
+            this.suppressEvents(() => this.adapter.updateNodeText(activeNode, mermaidBlock));
+          }
         }
 
         this.suppressEvents(() => this.adapter.requestCanvasSave(canvas));
-
         return result;
 
       } catch (err) {
@@ -356,10 +453,8 @@ export default class CanvasAIPlugin extends Plugin {
         const maxRetries = getMaxRetries(errorType);
 
         if (attempt >= maxRetries) {
-          // Max retries exhausted -- show error and give up
           this.handleApiError(errorType, err);
           this.setState('error');
-          // Auto-recover to idle after 5 seconds
           setTimeout(() => {
             if (!signal.aborted) this.setState('idle');
           }, 5000);
@@ -368,7 +463,6 @@ export default class CanvasAIPlugin extends Plugin {
 
         const delay = getRetryDelay(errorType, attempt, this.extractRetryAfter(err));
         if (delay === 0) {
-          // No retry (auth errors)
           this.handleApiError(errorType, err);
           this.setState('error');
           return null;
@@ -381,6 +475,78 @@ export default class CanvasAIPlugin extends Plugin {
     }
 
     return null;
+  }
+
+  /**
+   * Fire an asynchronous image generation request via Runware (D-08).
+   * Non-blocking -- called from onNodeBoundary for image nodes.
+   * Swaps the placeholder text node for a file node on success per UI-SPEC.
+   */
+  private async fireImageGeneration(prompt: string, placeholderNode: any, canvas: any): Promise<void> {
+    // Check if Runware client is available
+    if (!this.runwareClient || !this.settings.runwareApiKey) {
+      this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--streaming');
+      this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--image-placeholder');
+      this.suppressEvents(() => this.adapter.updateNodeText(placeholderNode, 'Image generation failed'));
+      new Notice('Canvas AI: Image generation failed. Check your Runware API key in Settings.');
+      return;
+    }
+
+    try {
+      // 1. Call Runware SDK
+      const images = await this.runwareClient.generateImage(prompt);
+      if (!images || images.length === 0 || !images[0].imageBase64Data) {
+        this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--streaming');
+        this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--image-placeholder');
+        this.suppressEvents(() => this.adapter.updateNodeText(placeholderNode, 'Image generation failed'));
+        new Notice('Canvas AI: Image generation failed. Check your Runware API key in Settings.');
+        return;
+      }
+
+      // 2. Save image to vault via ImageSaver
+      if (!this.imageSaver) {
+        this.imageSaver = new ImageSaver(this.app.vault, this.settings.imageSavePath);
+      }
+      const filePath = await this.imageSaver.saveToVault(images[0].imageBase64Data);
+
+      // 3. Swap placeholder text node for file node (UI-SPEC Placeholder-to-File-Node Swap Sequence)
+      const pos = {
+        x: placeholderNode.x,
+        y: placeholderNode.y,
+        width: placeholderNode.width,
+        height: placeholderNode.height,
+      };
+
+      this.suppressEvents(() => {
+        // Remove placeholder text node
+        this.adapter.removeNodeFromCanvas(canvas, placeholderNode);
+        // Remove placeholder ID from tracking
+        if (placeholderNode.id) this.aiNodeIds.delete(placeholderNode.id);
+
+        // Create file node at same position
+        const fileNode = this.adapter.createFileNodeOnCanvas(canvas, pos, filePath, this.settings.aiNodeColor);
+        if (fileNode?.id) {
+          this.aiNodeIds.add(fileNode.id);
+        }
+      });
+
+      this.adapter.requestCanvasSave(canvas);
+
+    } catch (err) {
+      console.error('[Canvas AI] Image generation failed:', err);
+      this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--streaming');
+      this.adapter.removeNodeCssClass(placeholderNode, 'canvas-ai-node--image-placeholder');
+      this.suppressEvents(() => this.adapter.updateNodeText(placeholderNode, 'Image generation failed'));
+
+      // Determine error type for appropriate notice
+      const errMsg = err instanceof Error ? err.message : 'Unknown error';
+      if (errMsg.toLowerCase().includes('auth') || errMsg.toLowerCase().includes('key')) {
+        new Notice('Canvas AI: Runware API key is invalid. Update it in Settings > Canvas AI.');
+      } else if (errMsg.toLowerCase().includes('connect') || errMsg.toLowerCase().includes('network')) {
+        new Notice('Canvas AI: Could not connect to Runware. Image generation unavailable.');
+      }
+      // Timeouts: no Notice per UI-SPEC error recovery table
+    }
   }
 
   // ─── Error Handling ───────────────────────────────────────────────

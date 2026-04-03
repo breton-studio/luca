@@ -9,11 +9,14 @@
     "test": "jest --bail"
   },
   "dependencies": {
-    "monkey-around": "3.0.0"
+    "@anthropic-ai/sdk": "^0.82.0",
+    "monkey-around": "3.0.0",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "@types/node": "^20",
     "@types/jest": "^29",
+    "@types/node": "^20",
+    "@types/uuid": "^10.0.0",
     "builtin-modules": "^4.0.0",
     "esbuild": "^0.24.2",
     "jest": "^29",

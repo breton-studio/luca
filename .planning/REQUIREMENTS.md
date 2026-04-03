@@ -8,8 +8,8 @@
 ### Foundation
 
 - [x] **FOUN-01**: Plugin loads in Obsidian and registers lifecycle hooks (onload/onunload)
-- [ ] **FOUN-02**: Canvas Adapter Layer wraps all undocumented canvas internal APIs behind a stable interface
-- [ ] **FOUN-03**: Canvas Adapter has file-based JSON fallback when internal APIs are unavailable
+- [x] **FOUN-02**: Canvas Adapter Layer wraps all undocumented canvas internal APIs behind a stable interface
+- [x] **FOUN-03**: Canvas Adapter has file-based JSON fallback when internal APIs are unavailable
 - [ ] **FOUN-04**: Plugin detects canvas node create events via monkey-patching
 - [ ] **FOUN-05**: Plugin detects canvas node edit events via monkey-patching
 - [ ] **FOUN-06**: Plugin detects canvas node move events via monkey-patching
@@ -19,7 +19,7 @@
 - [x] **FOUN-10**: Settings UI with fields for Claude API key, Runware API key, and debounce delay
 - [ ] **FOUN-11**: Enable/disable toggle accessible from command palette and status bar
 - [ ] **FOUN-12**: Generation indicator in status bar shows thinking/idle/error state
-- [ ] **FOUN-13**: Canvas Adapter handles requestSave race condition (uses internal API, not vault.modify)
+- [x] **FOUN-13**: Canvas Adapter handles requestSave race condition (uses internal API, not vault.modify)
 
 ### Spatial Intelligence
 
@@ -111,8 +111,8 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | FOUN-01 | Phase 1 | Complete |
-| FOUN-02 | Phase 1 | Pending |
-| FOUN-03 | Phase 1 | Pending |
+| FOUN-02 | Phase 1 | Complete |
+| FOUN-03 | Phase 1 | Complete |
 | FOUN-04 | Phase 1 | Pending |
 | FOUN-05 | Phase 1 | Pending |
 | FOUN-06 | Phase 1 | Pending |
@@ -122,7 +122,7 @@
 | FOUN-10 | Phase 1 | Complete |
 | FOUN-11 | Phase 1 | Pending |
 | FOUN-12 | Phase 1 | Pending |
-| FOUN-13 | Phase 1 | Pending |
+| FOUN-13 | Phase 1 | Complete |
 | SPAT-01 | Phase 2 | Pending |
 | SPAT-02 | Phase 2 | Pending |
 | SPAT-03 | Phase 2 | Pending |

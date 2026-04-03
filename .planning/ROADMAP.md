@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 6 plans
 Plans:
 - [x] 01-01-PLAN.md -- Project scaffold, build toolchain, settings tab UI
-- [ ] 01-02-PLAN.md -- Canvas Adapter Layer with file-based fallback
+- [x] 01-02-PLAN.md -- Canvas Adapter Layer with file-based fallback
 - [ ] 01-03-PLAN.md -- Status bar manager and per-canvas context menu
 - [ ] 01-04-PLAN.md -- Canvas event detection via monkey-patching
 - [ ] 01-05-PLAN.md -- Debounce controller and full event pipeline wiring

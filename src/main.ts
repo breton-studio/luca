@@ -30,6 +30,8 @@ export default class CanvasAIPlugin extends Plugin {
   private claudeClient: Anthropic | null = null;
   private adapter!: CanvasAdapter;
   tokenUsage: TokenUsageData = { ...DEFAULT_TOKEN_USAGE };
+  /** When true, canvas events from AI operations are suppressed to prevent feedback loops */
+  _suppressCanvasEvents = false;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -118,6 +120,7 @@ export default class CanvasAIPlugin extends Plugin {
       if (!this.isCanvasEnabled(event.canvasPath)) return;
       // Only process if API key is configured
       if (!this.settings.claudeApiKey) return;
+      if (this._suppressCanvasEvents) return;
       this.generationController?.handleCanvasEvent(event.nodeId);
     };
 
@@ -139,6 +142,15 @@ export default class CanvasAIPlugin extends Plugin {
    */
   updateDebounceDelay(delaySeconds: number): void {
     this.generationController?.updateDelay(delaySeconds);
+  }
+
+  // ─── Event suppression for AI operations ──────────────────────────
+
+  /** Execute a canvas-mutating operation with event suppression to prevent feedback loops */
+  private suppressEvents<T>(fn: () => T): T {
+    this._suppressCanvasEvents = true;
+    try { return fn(); }
+    finally { this._suppressCanvasEvents = false; }
   }
 
   // ─── Generation Pipeline (GENP-01 through GENP-12) ───────────────
@@ -243,8 +255,8 @@ export default class CanvasAIPlugin extends Plugin {
       try {
         // Pre-allocate the first node (D-01, GENP-05, MMED-09)
         const firstPlacement = placements[0] ?? { x: 0, y: 0, width: 300, height: 200 };
-        let currentNode = this.adapter.createTextNodeOnCanvas(
-          canvas, firstPlacement, this.settings.aiNodeColor
+        let currentNode = this.suppressEvents(() =>
+          this.adapter.createTextNodeOnCanvas(canvas, firstPlacement, this.settings.aiNodeColor)
         );
 
         if (!currentNode) {
@@ -277,15 +289,17 @@ export default class CanvasAIPlugin extends Plugin {
             onTextUpdate: (text: string) => {
               // text = current node's visible content only (tags stripped by stream handler)
               // activeNode is updated by onNodeBoundary, so this always writes to the correct node
-              this.adapter.updateNodeText(activeNode, text);
+              this.suppressEvents(() => this.adapter.updateNodeText(activeNode, text));
             },
 
             onNodeBoundary: (completedNodeContent: string, nodeIndex: number) => {
               // A </node> boundary was detected mid-stream (D-03).
               // 1. Finalize the current node with its complete content
-              this.adapter.updateNodeText(activeNode, completedNodeContent);
-              this.adapter.removeNodeCssClass(activeNode, 'canvas-ai-node--streaming');
-              this.adapter.requestCanvasSave(canvas);
+              this.suppressEvents(() => {
+                this.adapter.updateNodeText(activeNode, completedNodeContent);
+                this.adapter.removeNodeCssClass(activeNode, 'canvas-ai-node--streaming');
+                this.adapter.requestCanvasSave(canvas);
+              });
 
               // 2. Create the next node if we haven't hit the 3-node cap (D-02)
               const nextIndex = nodeIndex + 1;
@@ -296,8 +310,8 @@ export default class CanvasAIPlugin extends Plugin {
                   width: 300,
                   height: 200,
                 };
-                const nextNode = this.adapter.createTextNodeOnCanvas(
-                  canvas, nextPlacement, this.settings.aiNodeColor
+                const nextNode = this.suppressEvents(() =>
+                  this.adapter.createTextNodeOnCanvas(canvas, nextPlacement, this.settings.aiNodeColor)
                 );
                 if (nextNode) {
                   // Add pulsing to the new node
@@ -323,10 +337,10 @@ export default class CanvasAIPlugin extends Plugin {
         const finalContents = result.nodeContents;
         if (finalContents.length > 0) {
           const lastContent = finalContents[finalContents.length - 1];
-          this.adapter.updateNodeText(activeNode, lastContent);
+          this.suppressEvents(() => this.adapter.updateNodeText(activeNode, lastContent));
         }
 
-        this.adapter.requestCanvasSave(canvas);
+        this.suppressEvents(() => this.adapter.requestCanvasSave(canvas));
 
         return result;
 

@@ -72,6 +72,8 @@ export class CanvasAISettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.debounceDelay = value;
             await this.plugin.saveSettings();
+            // Notify generation controller of delay change
+            this.plugin.updateDebounceDelay(value);
           })
       );
 

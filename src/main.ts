@@ -4,12 +4,16 @@ import { CanvasAISettings, DEFAULT_SETTINGS } from './types/settings';
 import { CanvasAISettingTab } from './settings';
 import { StatusBarManager } from './ui/status-bar';
 import { initCanvasPatching } from './canvas/canvas-patcher';
+import { GenerationController } from './canvas/generation-controller';
+import { CANVAS_EVENT_TYPES } from './canvas/canvas-events';
+import type { CanvasEvent } from './canvas/canvas-events';
 
 export default class CanvasAIPlugin extends Plugin {
   settings!: CanvasAISettings;
   private statusBarEl: HTMLElement | null = null;
   private statusBar!: StatusBarManager;
   private apiKeyNoticeShown = false;
+  private generationController: GenerationController | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -73,8 +77,57 @@ export default class CanvasAIPlugin extends Plugin {
     // Canvas event patching (FOUN-04, FOUN-05, FOUN-06, FOUN-07)
     initCanvasPatching(this);
 
-    // --- EXTENSION POINTS (filled by later plans) ---
-    // Plan 05: Debounce controller wiring
+    // Debounce controller (FOUN-08, FOUN-09)
+    this.generationController = new GenerationController(
+      this.settings.debounceDelay,
+      async (signal: AbortSignal) => {
+        // Phase 1: No actual generation -- just demonstrate the pipeline
+        this.setLastTriggerTime(new Date());
+        this.setState('thinking');
+
+        // Simulate generation completing (Phase 3 replaces this with Claude API call)
+        // In Phase 1, go back to idle after a short delay to show the state change
+        setTimeout(() => {
+          if (!signal.aborted) {
+            this.setState('idle');
+          }
+        }, 500);
+      }
+    );
+
+    // Listen for canvas events and route to debounce controller
+    const canvasEventHandler = (event: CanvasEvent) => {
+      // Only process events from enabled canvases
+      if (!this.isCanvasEnabled(event.canvasPath)) return;
+      // Only process if API key is configured
+      if (!this.settings.claudeApiKey) return;
+      this.generationController?.handleCanvasEvent();
+    };
+
+    this.registerEvent(
+      this.app.workspace.on(CANVAS_EVENT_TYPES.NODE_CREATED as any, canvasEventHandler)
+    );
+    this.registerEvent(
+      this.app.workspace.on(CANVAS_EVENT_TYPES.NODE_REMOVED as any, canvasEventHandler)
+    );
+    this.registerEvent(
+      this.app.workspace.on(CANVAS_EVENT_TYPES.NODE_MOVED as any, canvasEventHandler)
+    );
+    this.registerEvent(
+      this.app.workspace.on(CANVAS_EVENT_TYPES.CANVAS_CHANGED as any, canvasEventHandler)
+    );
+  }
+
+  onunload(): void {
+    this.generationController?.destroy();
+  }
+
+  /**
+   * Update the debounce delay on the generation controller.
+   * Called from settings tab when the slider value changes.
+   */
+  updateDebounceDelay(delaySeconds: number): void {
+    this.generationController?.updateDelay(delaySeconds);
   }
 
   // --- Settings persistence ---

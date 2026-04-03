@@ -36,22 +36,22 @@
 
 ### Generation Pipeline
 
-- [ ] **GENP-01**: Claude Opus 4.6 called via Anthropic SDK with SSE streaming
-- [ ] **GENP-02**: Streaming uses Node.js fetch in Electron (not Obsidian requestUrl)
+- [x] **GENP-01**: Claude Opus 4.6 called via Anthropic SDK with SSE streaming
+- [x] **GENP-02**: Streaming uses Node.js fetch in Electron (not Obsidian requestUrl)
 - [x] **GENP-03**: Text content streams progressively into pre-allocated canvas nodes
 - [x] **GENP-04**: Streaming updates buffered to 200-300ms intervals to prevent layout thrash
 - [x] **GENP-05**: Node dimensions pre-allocated before streaming begins
-- [ ] **GENP-06**: System prompt includes spatial context, taste profile, and medium selection instructions
-- [ ] **GENP-07**: Opus decides which medium type(s) to generate based on canvas context
-- [ ] **GENP-08**: Prompt caching enabled for system prompt to reduce input token costs
+- [x] **GENP-06**: System prompt includes spatial context, taste profile, and medium selection instructions
+- [x] **GENP-07**: Opus decides which medium type(s) to generate based on canvas context
+- [x] **GENP-08**: Prompt caching enabled for system prompt to reduce input token costs
 - [x] **GENP-09**: Token budget system with configurable daily/hourly caps
 - [x] **GENP-10**: Budget exceeded state shown in UI, generation paused until reset
-- [ ] **GENP-11**: Timeout watchdog detects streaming pauses >30s with user-visible feedback
-- [ ] **GENP-12**: API errors handled gracefully (retry with backoff, surface in status bar, never crash canvas)
+- [x] **GENP-11**: Timeout watchdog detects streaming pauses >30s with user-visible feedback
+- [x] **GENP-12**: API errors handled gracefully (retry with backoff, surface in status bar, never crash canvas)
 
 ### Multi-Medium Output
 
-- [ ] **MMED-01**: Text/markdown nodes generated with properly formatted content
+- [x] **MMED-01**: Text/markdown nodes generated with properly formatted content
 - [ ] **MMED-02**: Code block nodes generated with language-tagged fenced code blocks
 - [ ] **MMED-03**: Mermaid diagram nodes generated using Obsidian's built-in Mermaid renderer
 - [ ] **MMED-04**: Mermaid rendering buffered until diagram is complete (no mid-stream render)
@@ -133,19 +133,19 @@
 | SPAT-08 | Phase 2 | Complete |
 | SPAT-09 | Phase 2 | Complete |
 | SPAT-10 | Phase 2 | Complete |
-| GENP-01 | Phase 3 | Pending |
-| GENP-02 | Phase 3 | Pending |
+| GENP-01 | Phase 3 | Complete |
+| GENP-02 | Phase 3 | Complete |
 | GENP-03 | Phase 3 | Complete |
 | GENP-04 | Phase 3 | Complete |
 | GENP-05 | Phase 3 | Complete |
-| GENP-06 | Phase 3 | Pending |
-| GENP-07 | Phase 3 | Pending |
-| GENP-08 | Phase 3 | Pending |
+| GENP-06 | Phase 3 | Complete |
+| GENP-07 | Phase 3 | Complete |
+| GENP-08 | Phase 3 | Complete |
 | GENP-09 | Phase 3 | Complete |
 | GENP-10 | Phase 3 | Complete |
-| GENP-11 | Phase 3 | Pending |
-| GENP-12 | Phase 3 | Pending |
-| MMED-01 | Phase 3 | Pending |
+| GENP-11 | Phase 3 | Complete |
+| GENP-12 | Phase 3 | Complete |
+| MMED-01 | Phase 3 | Complete |
 | MMED-02 | Phase 4 | Pending |
 | MMED-03 | Phase 4 | Pending |
 | MMED-04 | Phase 4 | Pending |

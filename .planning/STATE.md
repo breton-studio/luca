@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-04-03T16:10:08.877Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-04-03T16:11:03.892Z"
 last_activity: 2026-04-03
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 14
-  completed_plans: 11
+  completed_plans: 12
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 03 (core-generation-loop) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-04-03
 
@@ -62,6 +62,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P03 | 3min | 2 tasks | 3 files |
 | Phase 03 P01 | 5min | 3 tasks | 7 files |
 | Phase 03 P03 | 4min | 4 tasks | 5 files |
+| Phase 03 P02 | 4min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,10 @@ Recent decisions affecting current work:
 - [Phase 03]: Defensive canvas.addNode guard after createTextNode -- behavior varies by Obsidian version
 - [Phase 03]: unknownData.canvasAiStreaming as persistent marker for CSS class re-application on re-render
 - [Phase 03]: Plugin methods for settings (setBudgetOverride, openTasteProfile, resetTasteProfile) deferred to Plan 04 wiring
+- [Phase 03]: Mock Anthropic SDK constructor via jest.mock to verify client init params without real SDK
+- [Phase 03]: 2-block system prompt: block 1 (instructions+taste) cached with ephemeral, block 2 (spatial narrative) dynamic
+- [Phase 03]: Tag-aware stream accumulation via extractCurrentNodeVisibleText parses raw text by node index for clean visible text
+- [Phase 03]: Buffer flush via setTimeout on each delta, not setInterval -- naturally throttles without lingering timers
 
 ### Pending Todos
 
@@ -115,6 +120,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-03T16:10:08.874Z
-Stopped at: Completed 03-03-PLAN.md
+Last session: 2026-04-03T16:11:03.889Z
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
+    "@runware/sdk-js": "^1.2.8",
     "monkey-around": "3.0.0",
     "uuid": "^9.0.1"
   },

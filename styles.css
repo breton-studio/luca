@@ -23,3 +23,27 @@
 .canvas-ai-invalid {
   color: var(--text-error);
 }
+
+/* Phase 3: Streaming status */
+.canvas-ai-status--streaming {
+  color: var(--text-normal);
+}
+
+/* Phase 3: Budget exceeded status */
+.canvas-ai-status--budget {
+  color: var(--text-warning);
+}
+
+/* Phase 3: AI node streaming pulse (D-04) */
+.canvas-ai-node--streaming {
+  animation: canvas-ai-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes canvas-ai-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px var(--interactive-accent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent) 40%, transparent);
+  }
+}

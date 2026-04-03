@@ -1,6 +1,6 @@
 import { Menu } from 'obsidian';
 
-export type StatusBarState = 'idle' | 'thinking' | 'error';
+export type StatusBarState = 'idle' | 'thinking' | 'streaming' | 'budget' | 'error';
 
 /**
  * StatusBarManager (FOUN-12).
@@ -92,6 +92,11 @@ export class StatusBarManager {
         .setTitle(`Last trigger: ${this.lastTriggerTime ?? 'never'}`)
         .setDisabled(true)
     );
+    if (this.state === 'budget') {
+      menu.addItem((item) =>
+        item.setTitle('Budget: exceeded').setDisabled(true)
+      );
+    }
     menu.showAtMouseEvent(evt);
   }
 
@@ -105,11 +110,13 @@ export class StatusBarManager {
     this.visible = false;
   }
 
-  private renderState(text: string, cssState: 'idle' | 'thinking' | 'error'): void {
+  private renderState(text: string, cssState: StatusBarState): void {
     this.el.setText(text);
     this.el.removeClass(
       'canvas-ai-status--idle',
       'canvas-ai-status--thinking',
+      'canvas-ai-status--streaming',
+      'canvas-ai-status--budget',
       'canvas-ai-status--error'
     );
     this.el.addClass(`canvas-ai-status--${cssState}`);

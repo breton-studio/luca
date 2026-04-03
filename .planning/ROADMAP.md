@@ -70,7 +70,7 @@ Plans:
 - [x] 03-02-PLAN.md -- Claude client, prompt builder, stream handler
 - [x] 03-03-PLAN.md -- Canvas write adapter, status bar extension, settings UI, CSS
 - [x] 03-04-PLAN.md -- Pipeline wiring in main.ts
-- [ ] 03-05-PLAN.md -- Build verification and manual testing in live Obsidian
+- [x] 03-05-PLAN.md -- Build verification and manual testing in live Obsidian
 
 ### Phase 4: Multi-Medium Expansion
 **Goal**: Claude decides whether to generate code blocks, Mermaid diagrams, or images based on canvas context, and each medium type renders correctly on the canvas

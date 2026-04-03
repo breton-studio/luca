@@ -14,8 +14,8 @@
 - [x] **FOUN-05**: Plugin detects canvas node edit events via monkey-patching
 - [x] **FOUN-06**: Plugin detects canvas node move events via monkey-patching
 - [x] **FOUN-07**: Plugin detects canvas node delete events via monkey-patching
-- [ ] **FOUN-08**: Debounce timer triggers generation after ~3s of user idle (configurable)
-- [ ] **FOUN-09**: In-flight generation requests are cancelled when new debounce fires (AbortController)
+- [x] **FOUN-08**: Debounce timer triggers generation after ~3s of user idle (configurable)
+- [x] **FOUN-09**: In-flight generation requests are cancelled when new debounce fires (AbortController)
 - [x] **FOUN-10**: Settings UI with fields for Claude API key, Runware API key, and debounce delay
 - [x] **FOUN-11**: Enable/disable toggle accessible from command palette and status bar
 - [x] **FOUN-12**: Generation indicator in status bar shows thinking/idle/error state
@@ -117,8 +117,8 @@
 | FOUN-05 | Phase 1 | Complete |
 | FOUN-06 | Phase 1 | Complete |
 | FOUN-07 | Phase 1 | Complete |
-| FOUN-08 | Phase 1 | Pending |
-| FOUN-09 | Phase 1 | Pending |
+| FOUN-08 | Phase 1 | Complete |
+| FOUN-09 | Phase 1 | Complete |
 | FOUN-10 | Phase 1 | Complete |
 | FOUN-11 | Phase 1 | Complete |
 | FOUN-12 | Phase 1 | Complete |

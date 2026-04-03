@@ -134,6 +134,127 @@ export class CanvasAdapter {
     }
   }
 
+  // ─── Write Methods (Phase 3) ──────────────────────────────────────
+  // IMPORTANT (FOUN-13): All write methods use internal Canvas API ONLY.
+  // Never use vault.modify() while a canvas view is active -- canvas's
+  // requestSave debounce (2-second window) would overwrite file changes.
+
+  /**
+   * Create a text node on the canvas at the specified position.
+   * Uses internal Canvas API createTextNode (Obsidian ^1.12 object format).
+   *
+   * @param canvas - Internal canvas object
+   * @param position - Node position and dimensions
+   * @param color - Optional canvas color preset ("1"-"6") for AI node (MMED-10)
+   * @returns The created node, or null on failure
+   */
+  createTextNodeOnCanvas(
+    canvas: any,
+    position: { x: number; y: number; width: number; height: number },
+    color?: string
+  ): any | null {
+    try {
+      const node = canvas.createTextNode({
+        pos: { x: position.x, y: position.y },
+        size: { width: position.width, height: position.height },
+        text: '',
+        focus: false,
+      });
+
+      // Set AI node color if provided (MMED-10).
+      // Must use setData() for persistence -- direct property assignment is runtime-only (Pitfall 5).
+      if (color !== undefined) {
+        node.setData({ color });
+      }
+
+      // Defensively add to canvas if createTextNode didn't auto-add (Open Question 1).
+      if (!canvas.nodes.has(node.id)) {
+        canvas.addNode(node);
+      }
+
+      return node;
+    } catch (e) {
+      console.error('CanvasAdapter: createTextNodeOnCanvas failed (internal API unavailable)', e);
+      return null;
+    }
+  }
+
+  /**
+   * Update the text content of an existing canvas node.
+   * Fire-and-forget for intermediate streaming flushes (Open Question 2).
+   * Wraps silently -- node may have been destroyed.
+   *
+   * @param node - Internal canvas node object
+   * @param text - New text content
+   */
+  updateNodeText(node: any, text: string): void {
+    try {
+      node.setText(text);
+    } catch {
+      // Silently catch -- node may have been destroyed during streaming
+    }
+  }
+
+  /**
+   * Add a CSS class to a canvas node's DOM element.
+   * Also sets a persistent marker in unknownData for re-application on re-render (Pitfall 8).
+   *
+   * @param node - Internal canvas node object
+   * @param className - CSS class name to add
+   */
+  addNodeCssClass(node: any, className: string): void {
+    node.nodeEl?.addClass(className);
+    node.unknownData = { ...node.unknownData, canvasAiStreaming: true };
+  }
+
+  /**
+   * Remove a CSS class from a canvas node's DOM element.
+   * Clears the persistent marker in unknownData.
+   *
+   * @param node - Internal canvas node object
+   * @param className - CSS class name to remove
+   */
+  removeNodeCssClass(node: any, className: string): void {
+    node.nodeEl?.removeClass(className);
+    if (node.unknownData) {
+      delete node.unknownData.canvasAiStreaming;
+    }
+  }
+
+  /**
+   * Resize a canvas node (e.g., after streaming completes to fit content).
+   * Preserves original x, y, and width; only changes height.
+   *
+   * @param node - Internal canvas node object
+   * @param height - New height value
+   */
+  resizeNode(node: any, height: number): void {
+    try {
+      node.moveAndResize({
+        x: node.x,
+        y: node.y,
+        width: node.width,
+        height,
+      });
+    } catch {
+      // Silently catch -- node may have been destroyed
+    }
+  }
+
+  /**
+   * Request the canvas to persist its current state.
+   * Call after streaming completes to ensure final node state is saved.
+   *
+   * @param canvas - Internal canvas object
+   */
+  requestCanvasSave(canvas: any): void {
+    try {
+      canvas.requestSave();
+    } catch {
+      // Silently catch -- canvas may have been closed
+    }
+  }
+
   /**
    * FALLBACK (FOUN-03): Read canvas data from file when internal API is unavailable.
    * Used when: canvas view is not active, internal API breaks, or batch reading.

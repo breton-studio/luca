@@ -35,7 +35,7 @@ Plans:
 - [x] 01-01-PLAN.md -- Project scaffold, build toolchain, settings tab UI
 - [x] 01-02-PLAN.md -- Canvas Adapter Layer with file-based fallback
 - [x] 01-03-PLAN.md -- Status bar manager and per-canvas context menu
-- [ ] 01-04-PLAN.md -- Canvas event detection via monkey-patching
+- [x] 01-04-PLAN.md -- Canvas event detection via monkey-patching
 - [ ] 01-05-PLAN.md -- Debounce controller and full event pipeline wiring
 - [ ] 01-06-PLAN.md -- Manual verification in live Obsidian
 

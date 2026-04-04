@@ -198,7 +198,7 @@ Trigger Node          Generated Node 1
 | Reset confirmation dialog title | `Reset taste profile` |
 | Reset confirmation dialog body | `This will replace your current taste profile with the default. Your existing preferences will be lost. Continue?` |
 | Reset confirmation: confirm | `Reset` |
-| Reset confirmation: cancel | `Cancel` |
+| Reset confirmation: dismiss | `Keep my profile` |
 | Empty state: no taste profile file | No empty state -- plugin seeds `DEFAULT_TASTE_PROFILE` on first load. User always has a file. |
 | Error state: profile file unreadable | Falls back silently to `DEFAULT_TASTE_PROFILE`. No user-visible error -- logged to console only. |
 | Counter-sycophancy system prompt | Hardcoded in `GENERATION_INSTRUCTIONS` constant. Not user-visible. See RESEARCH.md for exact wording. |

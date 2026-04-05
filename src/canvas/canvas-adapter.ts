@@ -362,6 +362,7 @@ export class CanvasAdapter {
       maxX: node.x + node.width,
       maxY: node.y + node.height,
     };
+    const companionOf = node.unknownData?.companionOf;
     return {
       id: node.id ?? '',
       type: this.resolveNodeType(node),
@@ -371,6 +372,7 @@ export class CanvasAdapter {
       height: node.height ?? ((bbox.maxY - bbox.minY) || 200),
       content: this.resolveContent(node),
       color: node.color ?? undefined,
+      companionOf: typeof companionOf === 'string' ? companionOf : undefined,
     };
   }
 
@@ -379,6 +381,9 @@ export class CanvasAdapter {
    * Uses the standard CanvasData JSON format from obsidian/canvas.
    */
   private normalizeNodeData(nodeData: AllCanvasNodeData): CanvasNodeInfo {
+    // CanvasData's file-based JSON can also carry unknownData — Obsidian
+    // preserves extra fields verbatim when serializing/deserializing.
+    const companionOf = (nodeData as any).unknownData?.companionOf;
     return {
       id: nodeData.id,
       type: nodeData.type as CanvasNodeInfo['type'],
@@ -388,6 +393,7 @@ export class CanvasAdapter {
       height: nodeData.height,
       content: this.resolveContentFromData(nodeData),
       color: nodeData.color ?? undefined,
+      companionOf: typeof companionOf === 'string' ? companionOf : undefined,
     };
   }
 

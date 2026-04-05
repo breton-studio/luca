@@ -22,7 +22,7 @@ function makeNode(
   id: string,
   opts: Partial<CanvasNodeInfo> = {}
 ): CanvasNodeInfo {
-  return {
+  const node: CanvasNodeInfo = {
     id,
     type: 'text',
     x: 0,
@@ -32,6 +32,7 @@ function makeNode(
     content: '',
     ...opts,
   };
+  return node;
 }
 
 function makeEdge(id: string, fromNode: string, toNode: string): CanvasEdgeInfo {
@@ -362,5 +363,152 @@ describe('detectIterationContext', () => {
     expect(result).not.toBeNull();
     expect(result!.primarySource.node.id).toBe('ai1');
     expect(result!.additionalSources).toHaveLength(0);
+  });
+
+  // Companion redirection: when the user draws an edge from a Phase 5
+  // companion render node (the rendered visual), the iteration should
+  // target the UNDERLYING code node the companion belongs to. The
+  // companion's `companionOf` marker points at its code source.
+  describe('companion-to-code redirection', () => {
+    test('redirects HTML companion source to the underlying code node', () => {
+      const trigger = makeNode('t1', { content: 'make the circle red' });
+      const codeNode = makeNode('code1', {
+        content: CODE_HTML_CONTENT,
+        x: 0,
+        y: 0,
+        width: 400,
+        height: 250,
+      });
+      // HTML companion: text is NBSP (empty-ish), marker points at code1
+      const companionNode = makeNode('comp1', {
+        content: '\u00a0',
+        x: 424,
+        y: 0,
+        width: 400,
+        height: 250,
+        companionOf: 'code1',
+      });
+      const result = detectIterationContext({
+        triggerNodeId: 't1',
+        nodes: [trigger, codeNode, companionNode],
+        edges: [makeEdge('e1', 'comp1', 't1')], // edge FROM companion
+        aiNodeIds: new Set(['code1', 'comp1']),
+      });
+      expect(result).not.toBeNull();
+      // Primary source should be the CODE node, not the companion
+      expect(result!.primarySource.node.id).toBe('code1');
+      expect(result!.primarySource.type).toBe('code');
+      expect(result!.primarySource.lang).toBe('html');
+      expect(result!.targetType).toBe('code');
+    });
+
+    test('redirects mermaid companion source to the underlying code node', () => {
+      // Mermaid companion's text IS a mermaid fence; without redirection it
+      // would misclassify as a mermaid iteration. With redirection, the
+      // underlying code (with lang=mermaid or a flow description) iterates.
+      const trigger = makeNode('t1', { content: 'add a cache node' });
+      const codeNode = makeNode('code1', {
+        content: '```mermaid\ngraph TD\n  A --> B\n```',
+      });
+      const companionNode = makeNode('comp1', {
+        content: '```mermaid\ngraph TD\n  A --> B\n```',
+        companionOf: 'code1',
+      });
+      const result = detectIterationContext({
+        triggerNodeId: 't1',
+        nodes: [trigger, codeNode, companionNode],
+        edges: [makeEdge('e1', 'comp1', 't1')],
+        aiNodeIds: new Set(['code1', 'comp1']),
+      });
+      expect(result!.primarySource.node.id).toBe('code1');
+      expect(result!.primarySource.type).toBe('mermaid');
+    });
+
+    test('redirects SVG companion source to the underlying code node', () => {
+      const trigger = makeNode('t1', { content: 'make the gear bigger' });
+      const codeNode = makeNode('code1', {
+        content: '```svg\n<svg><circle r="10"/></svg>\n```',
+      });
+      const companionNode = makeNode('comp1', {
+        content: '<svg><circle r="10"/></svg>',
+        companionOf: 'code1',
+      });
+      const result = detectIterationContext({
+        triggerNodeId: 't1',
+        nodes: [trigger, codeNode, companionNode],
+        edges: [makeEdge('e1', 'comp1', 't1')],
+        aiNodeIds: new Set(['code1', 'comp1']),
+      });
+      expect(result!.primarySource.node.id).toBe('code1');
+      expect(result!.primarySource.type).toBe('code');
+      expect(result!.primarySource.lang).toBe('svg');
+    });
+
+    test('edge from companion OR edge from underlying code produce same iteration target', () => {
+      const trigger = makeNode('t1', { content: 'iterate' });
+      const codeNode = makeNode('code1', { content: CODE_HTML_CONTENT });
+      const companionNode = makeNode('comp1', {
+        content: '\u00a0',
+        companionOf: 'code1',
+      });
+      const fromCompanion = detectIterationContext({
+        triggerNodeId: 't1',
+        nodes: [trigger, codeNode, companionNode],
+        edges: [makeEdge('e1', 'comp1', 't1')],
+        aiNodeIds: new Set(['code1', 'comp1']),
+      });
+      const fromCode = detectIterationContext({
+        triggerNodeId: 't1',
+        nodes: [trigger, codeNode, companionNode],
+        edges: [makeEdge('e2', 'code1', 't1')],
+        aiNodeIds: new Set(['code1', 'comp1']),
+      });
+      expect(fromCompanion!.primarySource.node.id).toBe('code1');
+      expect(fromCode!.primarySource.node.id).toBe('code1');
+      expect(fromCompanion!.primarySource.lang).toBe(fromCode!.primarySource.lang);
+      expect(fromCompanion!.targetType).toBe(fromCode!.targetType);
+    });
+
+    test('redirects before multi-source deduplication: edges from code AND its companion do not produce two sources', () => {
+      const trigger = makeNode('t1', { content: 'iterate' });
+      const codeNode = makeNode('code1', { content: CODE_HTML_CONTENT });
+      const companionNode = makeNode('comp1', {
+        content: '\u00a0',
+        companionOf: 'code1',
+      });
+      const result = detectIterationContext({
+        triggerNodeId: 't1',
+        nodes: [trigger, codeNode, companionNode],
+        edges: [
+          makeEdge('e1', 'code1', 't1'), // direct edge
+          makeEdge('e2', 'comp1', 't1'), // edge via companion (redirects to code1)
+        ],
+        aiNodeIds: new Set(['code1', 'comp1']),
+      });
+      // Both edges point at code1 after redirection → single source
+      expect(result).not.toBeNull();
+      expect(result!.primarySource.node.id).toBe('code1');
+      expect(result!.additionalSources).toHaveLength(0);
+    });
+
+    test('falls back to the companion node when its source code is no longer present', () => {
+      // User deleted the code node but kept the companion. The redirection
+      // should fall back to treating the companion itself as the source
+      // (it is still in aiNodeIds) rather than dropping the edge entirely.
+      const trigger = makeNode('t1', { content: 'iterate' });
+      const companionNode = makeNode('comp1', {
+        content: '\u00a0',
+        companionOf: 'code1', // code1 no longer in the nodes array
+      });
+      const result = detectIterationContext({
+        triggerNodeId: 't1',
+        nodes: [trigger, companionNode],
+        edges: [makeEdge('e1', 'comp1', 't1')],
+        aiNodeIds: new Set(['comp1']),
+      });
+      // Companion content is NBSP which classifies as text
+      expect(result).not.toBeNull();
+      expect(result!.primarySource.node.id).toBe('comp1');
+    });
   });
 });

@@ -191,15 +191,38 @@ export function detectIterationContext(
   const aiOrder = Array.from(aiNodeIds);
 
   // 5. Collect incoming edges, classify each source.
+  //
+  // Companion redirection: if the source is a Phase 5 companion render node
+  // (node.companionOf is set, pointing at its underlying code node), treat
+  // the edge as if it originated from the code node itself. The user's
+  // intent when dragging from the rendered visual is "iterate what I see",
+  // which semantically targets the code. If the code node is no longer in
+  // the canvas (user deleted it), fall back to the companion itself.
+  //
+  // Deduplication: if two edges resolve to the same source (e.g. one direct
+  // edge from the code + one via its companion), keep only the first.
   const sources: IterationSource[] = [];
+  const seenSourceIds = new Set<string>();
   for (const edge of edges) {
     if (edge.toNode !== triggerNodeId) continue;
-    const sourceNode = nodes.find(n => n.id === edge.fromNode);
+
+    let sourceNode = nodes.find(n => n.id === edge.fromNode);
     if (!sourceNode) continue;
+
+    if (sourceNode.companionOf) {
+      const codeNode = nodes.find(n => n.id === sourceNode!.companionOf);
+      if (codeNode) sourceNode = codeNode;
+      // If the code node is gone, fall through and classify the companion
+      // itself (it is still in aiNodeIds from the session).
+    }
+
+    if (seenSourceIds.has(sourceNode.id)) continue;
+
     const classified = classifyAiNode(sourceNode, aiNodeIds);
     if (!classified) continue;
     classified.createdIndex = aiOrder.indexOf(sourceNode.id);
     sources.push(classified);
+    seenSourceIds.add(sourceNode.id);
   }
 
   if (sources.length === 0) return null;

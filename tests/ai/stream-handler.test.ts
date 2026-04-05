@@ -1,4 +1,10 @@
-import { streamIntoNode, parseNodeContent, StreamCallbacks, StreamResult } from '../../src/ai/stream-handler';
+import {
+  streamIntoNode,
+  parseNodeContent,
+  StreamCallbacks,
+  StreamResult,
+  MAX_OUTPUT_TOKENS,
+} from '../../src/ai/stream-handler';
 import type { TypedNodeMeta } from '../../src/types/generation';
 import { MockStream, MockAnthropicClient, createMockClientWithStream } from '../__mocks__/anthropic';
 import { BUFFER_INTERVAL_MS } from '../../src/types/settings';
@@ -645,6 +651,43 @@ describe('stream-handler', () => {
 
         const result = await resultPromise;
         expect(result).toBeDefined();
+      });
+    });
+
+    // Phase 5 gap closure: the prior max_tokens: 4096 cap truncated long
+    // code outputs mid-stream. A tachometer dashboard request produced
+    // ~10,079 chars of code (~3,500-4,000 output tokens) before hitting
+    // the cap; `</node>` never arrived, `onNodeBoundary` never fired,
+    // and no companion node was created. Opus 4.6 standard supports up
+    // to 32,768 output tokens — 16,384 gives ~60k char budget, comfortably
+    // handling realistic code outputs.
+    describe('MAX_OUTPUT_TOKENS (Phase 5 gap closure)', () => {
+      test('MAX_OUTPUT_TOKENS is at least 16384', () => {
+        expect(MAX_OUTPUT_TOKENS).toBeGreaterThanOrEqual(16384);
+      });
+
+      test('stream call passes MAX_OUTPUT_TOKENS as max_tokens to the Anthropic API', async () => {
+        const { client, stream } = createMockClientWithStream(
+          ['hi'],
+          { input_tokens: 10, output_tokens: 1 }
+        );
+        const signal = new AbortController().signal;
+        const resultPromise = streamIntoNode(
+          client as any,
+          [{ type: 'text', text: 'system prompt' }],
+          'user message',
+          signal,
+          callbacks
+        );
+        stream.emitText('hi');
+        jest.advanceTimersByTime(BUFFER_INTERVAL_MS + 10);
+        await resultPromise;
+
+        // Anthropic SDK's messages.stream is a jest.fn — first arg is the
+        // request params, second arg is the options (signal, etc.).
+        expect(client.messages.stream).toHaveBeenCalled();
+        const callArgs = (client.messages.stream as jest.Mock).mock.calls[0][0];
+        expect(callArgs.max_tokens).toBe(MAX_OUTPUT_TOKENS);
       });
     });
   });

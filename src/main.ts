@@ -336,6 +336,13 @@ export default class CanvasAIPlugin extends Plugin {
         const seenTypes = new Set<string>();
         let mermaidBuffer = '';
         let isBufferingMermaid = false;
+        // Track the latest flushed code content so the stream-completion
+        // fallback can finalize the code node and create its companion
+        // even if the stream ends without a </node> closing tag (e.g.
+        // max_tokens hit mid-stream). Reset whenever a code node is
+        // successfully closed via onNodeBoundary.
+        let latestCodeText = '';
+        let latestCodeLang: string | undefined = undefined;
 
         // Helper: create a node for the given type at the next placement
         const createNodeForType = (meta: TypedNodeMeta): any | null => {
@@ -413,6 +420,10 @@ export default class CanvasAIPlugin extends Plugin {
                 const lang = activeNodeMeta.lang ?? '';
                 const wrappedCode = '```' + lang + '\n' + text + '\n```';
                 this.suppressEvents(() => this.adapter.updateNodeText(activeNode, wrappedCode));
+                // Capture for the stream-completion fallback in case </node>
+                // never arrives (truncation). Updated on every flush.
+                latestCodeText = text;
+                latestCodeLang = activeNodeMeta.lang;
               } else if (activeNodeMeta?.type === 'text') {
                 // Progressive streaming (same as Phase 3)
                 this.suppressEvents(() => this.adapter.updateNodeText(activeNode, text));
@@ -444,6 +455,9 @@ export default class CanvasAIPlugin extends Plugin {
                   const finalizedCodeNode = activeNode;
                   const finalizedCodeLang = activeNodeMeta.lang;
                   this.createCompanionForCode(canvas, finalizedCodeNode, content, finalizedCodeLang);
+                  // Code node closed cleanly — clear the truncation-fallback state.
+                  latestCodeText = '';
+                  latestCodeLang = undefined;
                 } else if (activeNodeMeta.type === 'text') {
                   // Final flush with complete content
                   this.suppressEvents(() => this.adapter.updateNodeText(activeNode, content));
@@ -480,6 +494,19 @@ export default class CanvasAIPlugin extends Plugin {
             // Stream ended without closing tag -- flush partial with incomplete marker
             const mermaidBlock = '```mermaid\n' + mermaidBuffer + '\n%% (incomplete -- generation was interrupted)\n```';
             this.suppressEvents(() => this.adapter.updateNodeText(finalNode, mermaidBlock));
+          } else if (finalMeta.type === 'code' && latestCodeText) {
+            // Stream ended without </node> for a code node -- almost always
+            // means max_tokens was hit mid-stream. The code text is already
+            // visible in the node from the final onTextUpdate flush; what's
+            // missing is the companion render node (normally created from
+            // onNodeBoundary). Create it here from the latest flushed code
+            // so HTML/mermaid/svg outputs still pair with a preview.
+            console.warn(
+              `[Canvas AI] code stream ended without </node> — creating companion from partial content (${latestCodeText.length} chars, lang=${latestCodeLang ?? 'none'}). Likely max_tokens truncation.`
+            );
+            this.createCompanionForCode(canvas, finalNode, latestCodeText, latestCodeLang);
+            latestCodeText = '';
+            latestCodeLang = undefined;
           }
         }
 

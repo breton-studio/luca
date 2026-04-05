@@ -21,6 +21,21 @@ export type { TypedNodeMeta } from '../types/generation';
 const WATCHDOG_TIMEOUT_MS = 30_000; // 30 seconds (GENP-11)
 
 /**
+ * Maximum output tokens per Claude response.
+ *
+ * Opus 4.6 standard supports up to 32,768 output tokens. 16,384 gives
+ * roughly a 60k-character budget for generated content — enough headroom
+ * for realistic multi-medium responses including substantial code output.
+ *
+ * Phase 5 gap closure: the prior 4,096 cap truncated a tachometer-dashboard
+ * code response at ~10,079 characters (~3,500-4,000 tokens), leaving the
+ * code node unclosed and suppressing companion-node creation. See also
+ * main.ts streamWithRetry completion fallback for belt-and-braces handling
+ * of incomplete streams.
+ */
+export const MAX_OUTPUT_TOKENS = 16384;
+
+/**
  * Regex for matching typed node opening tags (D-01).
  * Matches: <node type="text">, <node type="code" lang="typescript">, etc.
  */
@@ -306,7 +321,7 @@ export async function streamIntoNode(
   const stream = client.messages.stream(
     {
       model: 'claude-opus-4-6',
-      max_tokens: 4096,
+      max_tokens: MAX_OUTPUT_TOKENS,
       system: systemPrompt as any,
       messages: [{ role: 'user', content: userMessage }],
     },

@@ -90,4 +90,44 @@ describe('prompt-builder', () => {
       expect(message).toContain('typed <node> tags');
     });
   });
+
+  describe('Counter-Sycophancy (TAST-07, D-04, D-05, D-06)', () => {
+    test('GENERATION_INSTRUCTIONS contains ## Intellectual Honesty section', () => {
+      expect(GENERATION_INSTRUCTIONS).toContain('## Intellectual Honesty');
+    });
+
+    test('GENERATION_INSTRUCTIONS contains not a yes-machine framing', () => {
+      expect(GENERATION_INSTRUCTIONS).toContain('not a yes-machine');
+    });
+
+    test('GENERATION_INSTRUCTIONS names all four behaviors (D-05)', () => {
+      expect(GENERATION_INSTRUCTIONS).toContain("**Devil's advocate:**");
+      expect(GENERATION_INSTRUCTIONS).toContain('**Unexpected connections:**');
+      expect(GENERATION_INSTRUCTIONS).toContain('**Uncomfortable questions:**');
+      expect(GENERATION_INSTRUCTIONS).toContain('**Contrarian references:**');
+    });
+
+    test('uses permissive timing language (D-06 probabilistic)', () => {
+      // Case-insensitive match: the prompt text begins the sentence with "Use your judgment"
+      // (capital U). Intent is to verify the permissive timing phrase is present regardless
+      // of sentence case.
+      expect(GENERATION_INSTRUCTIONS.toLowerCase()).toContain('use your judgment');
+      expect(GENERATION_INSTRUCTIONS.toLowerCase()).toContain('occasionally');
+    });
+
+    test('does NOT use imperative hostile phrasing (Pitfall 2)', () => {
+      expect(GENERATION_INSTRUCTIONS).not.toContain('always challenge');
+      expect(GENERATION_INSTRUCTIONS).not.toContain('never agree');
+    });
+
+    test('tells Claude not to flag the technique (no meta narration)', () => {
+      expect(GENERATION_INSTRUCTIONS).toContain('Never flag these');
+    });
+
+    test('counter-sycophancy lives inside the cached system prompt block (GENP-08)', () => {
+      const blocks = buildSystemPrompt('Tone: Restrained', 'spatial narrative');
+      expect(blocks[0].text).toContain('## Intellectual Honesty');
+      expect(blocks[0].cache_control).toEqual({ type: 'ephemeral' });
+    });
+  });
 });

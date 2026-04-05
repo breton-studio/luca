@@ -722,11 +722,13 @@ export default class CanvasAIPlugin extends Plugin {
       // Track companion as an AI node (do not trigger generation on interaction)
       if (companionNode.id) this.aiNodeIds.add(companionNode.id);
 
-      // Mark companion linkage for future canvas-reload re-injection (RESEARCH.md Open Q 1)
+      // Mark companion linkage + content type for reload re-hydration
+      // (see rehydrateCompanionNodes below — addresses plan 05-06 D8 caveat).
+      companionNode.unknownData = companionNode.unknownData ?? {};
       if (codeNode.id) {
-        companionNode.unknownData = companionNode.unknownData ?? {};
         companionNode.unknownData.companionOf = codeNode.id;
       }
+      companionNode.unknownData.companionContentType = contentType;
 
       // Apply type-specific CSS class (UI-SPEC contract)
       const cssClass = `canvas-ai-companion--${contentType}`;
@@ -736,6 +738,10 @@ export default class CanvasAIPlugin extends Plugin {
       if (contentType === 'html') {
         const htmlContent = createHtmlCompanionContent(codeContent, lang);
         if (htmlContent) {
+          // Persist the full HTML so reload rehydration can reconstruct the
+          // iframe without needing to re-parse the source code node. The
+          // canvas .canvas JSON preserves unknownData verbatim.
+          companionNode.unknownData.companionHtml = htmlContent;
           // Seed placeholder text so Obsidian's async markdown renderer
           // materializes the nested `.markdown-rendered` container inside
           // nodeEl. injectHtmlPreview will poll via rAF for that container
@@ -743,8 +749,6 @@ export default class CanvasAIPlugin extends Plugin {
           // seeding, the container never exists and the iframe ends up
           // clipped by the canvas CSS (Phase 5 verification gap fix).
           this.suppressEvents(() => this.adapter.updateNodeText(companionNode, '\u00a0'));
-          // Inject live iframe into DOM (Phase 5 session only -- reloads show raw source
-          // until a post-processor re-injects on canvas reload in a future phase)
           console.log(`[Canvas AI] HTML companion: seeding + injecting, content length=${htmlContent.length}`);
           injectHtmlPreview(companionNode, htmlContent);
         }
@@ -913,7 +917,83 @@ export default class CanvasAIPlugin extends Plugin {
     return (leaf.view as any).file?.path ?? null;
   }
 
-  private onActiveLeafChange(_leaf: WorkspaceLeaf | null): void {
+  private onActiveLeafChange(leaf: WorkspaceLeaf | null): void {
     this.refreshStatusBar();
+
+    // Rehydrate HTML companion iframes when a canvas becomes active. Canvas
+    // text nodes persist their `text` and `unknownData` to the .canvas JSON,
+    // but the iframe is a runtime-only DOM mutation inside nodeEl that does
+    // not survive a reload. Without rehydration, HTML companions appear as
+    // empty boxes after the canvas reopens. (Resolves plan 05-06 D8 caveat.)
+    if (leaf?.view && (leaf.view as any).getViewType?.() === 'canvas') {
+      const canvas = (leaf.view as any).canvas;
+      if (canvas) {
+        // Defer one frame so Obsidian has finished mounting node DOM.
+        // injectHtmlPreview has its own rAF polling on top of this.
+        requestAnimationFrame(() => this.rehydrateCompanionNodes(canvas));
+      }
+    }
+  }
+
+  /**
+   * Scan a canvas for AI companion nodes persisted from a prior session and
+   * re-inject runtime DOM (HTML iframes) that was lost on reload. Also
+   * rehydrates `aiNodeIds` so reloaded companions and their source code
+   * nodes still block generation-on-click and participate in the iteration
+   * feature.
+   *
+   * Idempotent: safe to call multiple times on the same canvas (e.g. when
+   * the user switches tabs and comes back). injectHtmlPreview empties the
+   * container before appending, so re-injection replaces rather than stacks.
+   */
+  private rehydrateCompanionNodes(canvas: any): void {
+    if (!canvas?.nodes || typeof canvas.nodes.values !== 'function') return;
+
+    const allNodes: any[] = Array.from(canvas.nodes.values());
+    let rehydratedHtml = 0;
+    let rehydratedAiMarkers = 0;
+
+    for (const node of allNodes) {
+      const unknownData = node.unknownData;
+      if (!unknownData) continue;
+
+      // Rehydrate aiNodeIds for any node that was an AI-created companion
+      // or the source code node a companion points at. This keeps reloaded
+      // sessions compatible with the iteration feature and Gate B.
+      if (unknownData.companionOf) {
+        if (node.id) {
+          this.aiNodeIds.add(node.id);
+          rehydratedAiMarkers++;
+        }
+        // Also mark the source code node (if still present) as AI-created.
+        const sourceNode = canvas.nodes.get?.(unknownData.companionOf);
+        if (sourceNode?.id) {
+          this.aiNodeIds.add(sourceNode.id);
+          rehydratedAiMarkers++;
+        }
+      }
+
+      // HTML iframe re-injection: only for companions that stored their
+      // HTML content in unknownData.companionHtml at creation time.
+      if (
+        unknownData.companionContentType === 'html' &&
+        typeof unknownData.companionHtml === 'string' &&
+        unknownData.companionHtml.length > 0
+      ) {
+        try {
+          injectHtmlPreview(node, unknownData.companionHtml);
+          rehydratedHtml++;
+        } catch (err) {
+          console.error('[Canvas AI] Companion rehydration failed for node', node.id, err);
+        }
+      }
+    }
+
+    if (rehydratedHtml > 0 || rehydratedAiMarkers > 0) {
+      console.log(
+        `[Canvas AI] canvas rehydrated: ${rehydratedHtml} HTML companion(s), ` +
+          `${rehydratedAiMarkers} aiNodeIds marker(s)`
+      );
+    }
   }
 }

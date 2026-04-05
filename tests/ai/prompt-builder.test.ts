@@ -130,4 +130,82 @@ describe('prompt-builder', () => {
       expect(blocks[0].cache_control).toEqual({ type: 'ephemeral' });
     });
   });
+
+  // Gap closure for Phase 5 manual verification (Group B/D):
+  //   1. "Image of A warm sand-to-clay gradient jersey..." → text + mermaid (no image)
+  //   2. Mermaid emitted for fabric/design descriptions that have nothing to do
+  //      with processes, flows, or hierarchies
+  //
+  // Root cause in the pre-fix prompt:
+  //   - "Image: use sparingly -- only when a visual concept is genuinely powerful"
+  //   - "Do not generate images unless the spatial context strongly calls for it"
+  //   - No mechanism to honor an explicit user request for a specific medium
+  //   - Mermaid restriction ("ONLY for processes/flows") lacked concrete forbidden
+  //     examples, so Claude treated it as a soft preference
+  describe('Explicit Medium Requests (Phase 5 gap closure)', () => {
+    test('GENERATION_INSTRUCTIONS contains ## Explicit User Requests section', () => {
+      expect(GENERATION_INSTRUCTIONS).toContain('## Explicit User Requests');
+    });
+
+    test('lists image-requesting phrases the user might use', () => {
+      // Lowercase match — the prompt may use title case or sentence case
+      const lower = GENERATION_INSTRUCTIONS.toLowerCase();
+      expect(lower).toContain('image of');
+      expect(lower).toContain('photo of');
+      expect(lower).toContain('picture of');
+      expect(lower).toContain('illustration of');
+    });
+
+    test('instructs Claude to honor explicit requests (not substitute)', () => {
+      const lower = GENERATION_INSTRUCTIONS.toLowerCase();
+      // The explicit-request section must make it clear that a requested
+      // medium cannot be swapped for a different medium (text + mermaid for
+      // an image request was the observed bug).
+      expect(lower).toContain('must');
+      // Either "do not substitute" or "do not replace" or similar
+      expect(
+        lower.includes('do not substitute') ||
+          lower.includes('do not replace') ||
+          lower.includes('not substitute')
+      ).toBe(true);
+    });
+
+    test('image guidance no longer contains anti-image bias phrases', () => {
+      // These exact phrases biased Claude away from images even when explicitly
+      // requested. They must be gone from the rewritten prompt.
+      expect(GENERATION_INSTRUCTIONS).not.toContain(
+        'use sparingly -- only when a visual concept is genuinely powerful'
+      );
+      expect(GENERATION_INSTRUCTIONS).not.toContain(
+        'Do not generate images unless the spatial context strongly calls for it'
+      );
+    });
+
+    test('mermaid rule uses FORBIDDEN/ALLOWED framing', () => {
+      // The old soft "Add mermaid ONLY when..." language produced mermaid output
+      // for fabric-gradient descriptions. Stronger framing with explicit negative
+      // examples should suppress that.
+      expect(GENERATION_INSTRUCTIONS).toContain('FORBIDDEN');
+      expect(GENERATION_INSTRUCTIONS).toContain('ALLOWED');
+    });
+
+    test('mermaid FORBIDDEN list names concrete non-process cases', () => {
+      // The Phase 5 failure was mermaid for "a warm sand-to-clay gradient jersey"
+      // (a design/object description). At least one of these categories must be
+      // listed as forbidden so Claude has a clear example of what to avoid.
+      const lower = GENERATION_INSTRUCTIONS.toLowerCase();
+      expect(
+        lower.includes('descriptions') ||
+          lower.includes('aesthetic') ||
+          lower.includes('materials') ||
+          lower.includes('objects')
+      ).toBe(true);
+    });
+
+    test('explicit-request section lives inside the cached system prompt block', () => {
+      const blocks = buildSystemPrompt('Tone: Restrained', 'spatial narrative');
+      expect(blocks[0].text).toContain('## Explicit User Requests');
+      expect(blocks[0].cache_control).toEqual({ type: 'ephemeral' });
+    });
+  });
 });

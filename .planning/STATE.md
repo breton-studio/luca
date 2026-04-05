@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-03-settings-reset-confirm-PLAN.md
-last_updated: "2026-04-05T00:59:56.917Z"
-last_activity: 2026-04-05 -- Phase 05 execution started
+stopped_at: Completed 05-01-taste-profile-structure-PLAN.md
+last_updated: "2026-04-05T01:02:46.137Z"
+last_activity: 2026-04-05
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 24
-  completed_plans: 19
+  completed_plans: 20
   percent: 25
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 05 (taste-profile-and-polish) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 05
-Last activity: 2026-04-05 -- Phase 05 execution started
+Plan: 2 of 6
+Status: Ready to execute
+Last activity: 2026-04-05
 
 Progress: [██░░░░░░░░] 25%
 
@@ -68,6 +68,7 @@ Progress: [██░░░░░░░░] 25%
 | Phase 04 P02 | 4min | 2 tasks | 6 files |
 | Phase 04 P03 | 4min | 2 tasks | 6 files |
 | Phase 05 P03 | 3min | 1 tasks | 1 files |
+| Phase 05 P01 | 5min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -136,6 +137,10 @@ Recent decisions affecting current work:
 - [Phase 04]: Image fireImageGeneration is async fire-and-forget -- Claude stream continues immediately
 - [Phase 05]: ResetTasteProfileConfirmModal pattern — extend Obsidian Modal, inject onConfirm callback, warning-styled destructive button; reusable for future destructive settings actions
 - [Phase 05]: UI-SPEC strings are single-source — code references them verbatim, JSDoc points back to UI-SPEC.md rather than duplicating to keep grep counts stable and force spec updates on reword
+- [Phase 05]: [Phase 05]: Nested TasteProfile shape (style + substance groups) with dual-format parser preserving D-03 legacy migration
+- [Phase 05]: [Phase 05]: Legacy-vs-nested detection uses top-level-only key check -- prevents indented 'tone:' sub-keys from being misclassified as flat
+- [Phase 05]: [Phase 05]: visual_preference legacy key maps to style.formatting (not style.voice) -- formatting is the correct conceptual bucket for visual aesthetics
+- [Phase 05]: [Phase 05]: TAST-04 (per-member profiles) deferred via file-level JSDoc in taste-profile.ts per D-08 -- single global profile for Phase 5
 
 ### Pending Todos
 
@@ -149,6 +154,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-05T00:59:56.915Z
-Stopped at: Completed 05-03-settings-reset-confirm-PLAN.md
+Last session: 2026-04-05T01:02:46.135Z
+Stopped at: Completed 05-01-taste-profile-structure-PLAN.md
 Resume file: None

@@ -450,14 +450,21 @@ export default class CanvasAIPlugin extends Plugin {
           }
         );
 
-        // Handle stream completion -- finalize any remaining active node
-        if (activeNode && activeNodeMeta) {
-          this.adapter.removeNodeCssClass(activeNode, 'canvas-ai-node--streaming');
+        // Handle stream completion -- finalize any remaining active node.
+        // Capture the closure-let into locals. TypeScript's cross-closure flow
+        // analysis narrows activeNodeMeta to `never` here because the last
+        // reachable assignment inside onNodeBoundary is `= null`; the cast
+        // restores the declared type so runtime reassignments (from
+        // onTextUpdate) are considered.
+        const finalNode = activeNode;
+        const finalMeta = activeNodeMeta as TypedNodeMeta | null;
+        if (finalNode && finalMeta) {
+          this.adapter.removeNodeCssClass(finalNode, 'canvas-ai-node--streaming');
 
-          if (activeNodeMeta.type === 'mermaid' && isBufferingMermaid) {
+          if (finalMeta.type === 'mermaid' && isBufferingMermaid) {
             // Stream ended without closing tag -- flush partial with incomplete marker
             const mermaidBlock = '```mermaid\n' + mermaidBuffer + '\n%% (incomplete -- generation was interrupted)\n```';
-            this.suppressEvents(() => this.adapter.updateNodeText(activeNode, mermaidBlock));
+            this.suppressEvents(() => this.adapter.updateNodeText(finalNode, mermaidBlock));
           }
         }
 

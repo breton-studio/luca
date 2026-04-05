@@ -14,7 +14,8 @@ export interface CanvasNodeInfo {
 }
 
 // Re-export spatial edge type for convenience
-export type { CanvasEdgeInfo } from '../spatial/types';
+import type { CanvasEdgeInfo } from '../spatial/types';
+export type { CanvasEdgeInfo };
 
 /**
  * Normalized canvas data (nodes + edges).

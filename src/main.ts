@@ -23,6 +23,14 @@ import type { PlacementCoordinate } from './spatial';
 import type { TypedNodeMeta } from './types/generation';
 import { RunwareImageClient } from './image/runware-client';
 import { ImageSaver } from './image/image-saver';
+import {
+  detectCompanionContentType,
+  createHtmlCompanionContent,
+  buildMermaidCompanionContent,
+  buildSvgCompanionContent,
+  computeCompanionPlacement,
+  injectHtmlPreview,
+} from './canvas/companion-node';
 
 /** Node dimensions by medium type per UI-SPEC and MMED-09 */
 const NODE_SIZES: Record<string, { width: number; height: number }> = {
@@ -429,6 +437,13 @@ export default class CanvasAIPlugin extends Plugin {
                   const lang = activeNodeMeta.lang ?? '';
                   const wrappedCode = '```' + lang + '\n' + content + '\n```';
                   this.suppressEvents(() => this.adapter.updateNodeText(activeNode, wrappedCode));
+
+                  // D-12, D-14: create companion render node AFTER code node is finalized.
+                  // Pitfall 4: companion is placed relative to the CODE node (not the trigger),
+                  // so it lives further right than any primary placement zone.
+                  const finalizedCodeNode = activeNode;
+                  const finalizedCodeLang = activeNodeMeta.lang;
+                  this.createCompanionForCode(canvas, finalizedCodeNode, content, finalizedCodeLang);
                 } else if (activeNodeMeta.type === 'text') {
                   // Final flush with complete content
                   this.suppressEvents(() => this.adapter.updateNodeText(activeNode, content));
@@ -587,6 +602,82 @@ export default class CanvasAIPlugin extends Plugin {
         new Notice('Canvas AI: Could not connect to Runware. Image generation unavailable.');
       }
       // Timeouts: no Notice per UI-SPEC error recovery table
+    }
+  }
+
+  // ─── Companion Render Nodes (D-12, D-13, D-14) ────────────────────
+
+  /**
+   * Create a companion render node for a code node (D-12, D-13, D-14).
+   *
+   * Called from onNodeBoundary when meta.type === 'code' AFTER the code node
+   * has been finalized. Detects the content type (HTML/Mermaid/SVG) and creates
+   * a visually-paired companion node to the right of the code node with
+   * mirror-matched dimensions.
+   *
+   * Non-blocking: failures are logged and swallowed so they don't break the stream.
+   */
+  private createCompanionForCode(
+    canvas: any,
+    codeNode: any,
+    codeContent: string,
+    lang: string | undefined
+  ): void {
+    if (!codeNode || !codeContent) return;
+
+    const contentType = detectCompanionContentType(codeContent, lang);
+    if (!contentType) return; // Language not supported for companion rendering
+
+    try {
+      const placement = computeCompanionPlacement({
+        x: codeNode.x,
+        y: codeNode.y,
+        width: codeNode.width,
+        height: codeNode.height,
+        id: codeNode.id,
+      });
+
+      const companionNode = this.suppressEvents(() =>
+        this.adapter.createTextNodeOnCanvas(
+          canvas,
+          placement,
+          this.settings.aiNodeColor
+        )
+      );
+      if (!companionNode) return;
+
+      // Track companion as an AI node (do not trigger generation on interaction)
+      if (companionNode.id) this.aiNodeIds.add(companionNode.id);
+
+      // Mark companion linkage for future canvas-reload re-injection (RESEARCH.md Open Q 1)
+      if (codeNode.id) {
+        companionNode.unknownData = companionNode.unknownData ?? {};
+        companionNode.unknownData.companionOf = codeNode.id;
+      }
+
+      // Apply type-specific CSS class (UI-SPEC contract)
+      const cssClass = `canvas-ai-companion--${contentType}`;
+      this.adapter.addNodeCssClass(companionNode, cssClass);
+
+      // Populate content by type
+      if (contentType === 'html') {
+        const htmlContent = createHtmlCompanionContent(codeContent, lang);
+        if (htmlContent) {
+          // Inject live iframe into DOM (Phase 5 session only -- reloads show raw source
+          // until a post-processor re-injects on canvas reload in a future phase)
+          injectHtmlPreview(companionNode, htmlContent);
+        }
+      } else if (contentType === 'mermaid') {
+        const mermaidBlock = buildMermaidCompanionContent(codeContent);
+        this.suppressEvents(() => this.adapter.updateNodeText(companionNode, mermaidBlock));
+      } else if (contentType === 'svg') {
+        const svgMarkup = buildSvgCompanionContent(codeContent);
+        this.suppressEvents(() => this.adapter.updateNodeText(companionNode, svgMarkup));
+      }
+
+      this.suppressEvents(() => this.adapter.requestCanvasSave(canvas));
+    } catch (err) {
+      console.error('[Canvas AI] Companion node creation failed:', err);
     }
   }
 

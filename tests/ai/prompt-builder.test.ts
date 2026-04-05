@@ -208,4 +208,81 @@ describe('prompt-builder', () => {
       expect(blocks[0].cache_control).toEqual({ type: 'ephemeral' });
     });
   });
+
+  // Gap closure #2 for Phase 5 manual verification:
+  //   User typed "Image of A warm sand-to-clay gradient jersey built from
+  //   three distinct fabrics..." Claude emitted a text node of commentary
+  //   first, then an image node whose prompt was "three fabric swatches
+  //   showing the transitions" — an illustration of Claude's own text,
+  //   not the jersey the user asked for.
+  //
+  // Root cause:
+  //   1. No ordering rule: text node was emitted first, so the image
+  //      description was generated in a context dominated by Claude's
+  //      own prior commentary.
+  //   2. Image guidance said "vivid, concrete visual description" with
+  //      no instruction to describe the SUBJECT THE USER NAMED.
+  //   3. No warning against visualizing sub-components when the user
+  //      asked for a complete object.
+  describe('Image prompt fidelity (Phase 5 gap closure)', () => {
+    test('instructs Claude that image content must describe the user-named subject', () => {
+      const lower = GENERATION_INSTRUCTIONS.toLowerCase();
+      // Must explicitly reference "the subject" or "what the user" in the
+      // image rules, so Claude knows the image is anchored to the trigger.
+      expect(
+        lower.includes('subject the user named') ||
+          lower.includes('subject the user asked') ||
+          lower.includes("user's subject")
+      ).toBe(true);
+    });
+
+    test('forbids illustrating Claude own text commentary for explicit image requests', () => {
+      const lower = GENERATION_INSTRUCTIONS.toLowerCase();
+      // The observed failure: text commentary generated first, then an
+      // image of the commentary instead of the user's subject.
+      expect(
+        lower.includes('not an illustration of your') ||
+          lower.includes('not illustrate your') ||
+          lower.includes('not a study of') ||
+          lower.includes('not substitute a sub-concept')
+      ).toBe(true);
+    });
+
+    test('requires image node to be emitted FIRST for explicit image requests', () => {
+      const lower = GENERATION_INSTRUCTIONS.toLowerCase();
+      // Ordering rule: image before text commentary so the text cannot
+      // warp the image prompt via streaming context dominance.
+      expect(lower).toContain('image');
+      expect(
+        lower.includes('emit the image') ||
+          lower.includes('output the image') ||
+          lower.includes('image node first') ||
+          lower.includes('image first')
+      ).toBe(true);
+    });
+
+    test('warns against visualizing sub-components when user asked for a complete object', () => {
+      const lower = GENERATION_INSTRUCTIONS.toLowerCase();
+      // Concrete example of the failure mode — user asks for "a jersey",
+      // Claude visualizes the fabric swatches.
+      expect(
+        lower.includes('complete object') ||
+          lower.includes('finished') ||
+          lower.includes('not the individual') ||
+          lower.includes('not a study of its components')
+      ).toBe(true);
+    });
+
+    test('tells Claude to paraphrase the user own concrete details', () => {
+      const lower = GENERATION_INSTRUCTIONS.toLowerCase();
+      // The image prompt to Runware must carry the user's actual words
+      // (colors, materials, shapes) — not invent new concepts.
+      expect(
+        lower.includes("user's own") ||
+          lower.includes('user own') ||
+          lower.includes('user supplied') ||
+          lower.includes('user-supplied')
+      ).toBe(true);
+    });
+  });
 });

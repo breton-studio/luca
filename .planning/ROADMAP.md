@@ -87,7 +87,7 @@ Plans:
 - [x] 04-01-PLAN.md -- Typed node tag parsing in stream handler
 - [x] 04-02-PLAN.md -- Runware image client, image saver, canvas file node adapter
 - [x] 04-03-PLAN.md -- Prompt builder update, pipeline wiring, settings, CSS
-- [ ] 04-04-PLAN.md -- Build verification and manual testing in live Obsidian
+- [x] 04-04-PLAN.md -- Build verification and manual testing in live Obsidian
 
 ### Phase 5: Taste Profile and Polish
 **Goal**: Each team member has their own taste profile that shapes AI output to match their thinking style, with safeguards against sycophantic flattening of novelty
@@ -98,7 +98,14 @@ Plans:
   2. Taste profile is editable through the settings UI or by editing the markdown/JSON file directly
   3. Style (how to communicate) and substance (what to communicate) are structurally separated in the profile
   4. Generated content occasionally challenges or surprises the user rather than only reinforcing existing patterns
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+- [ ] 05-01-PLAN.md -- Taste profile nested style/substance structure with legacy migration
+- [ ] 05-02-PLAN.md -- Counter-sycophancy instructions in system prompt
+- [ ] 05-03-PLAN.md -- Settings UI reset confirmation modal
+- [ ] 05-04-PLAN.md -- Edge-aligned placement replacing orbital
+- [ ] 05-05-PLAN.md -- Companion render nodes for HTML/Mermaid/SVG code
+- [ ] 05-06-PLAN.md -- Build verification and manual testing in live Obsidian
 **UI hint**: yes
 
 ## Progress
@@ -111,5 +118,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Foundation | 0/6 | Planning complete | - |
 | 2. Spatial Intelligence | 0/3 | Planning complete | - |
 | 3. Core Generation Loop | 0/5 | Planning complete | - |
-| 4. Multi-Medium Expansion | 3/4 | In Progress|  |
-| 5. Taste Profile and Polish | 0/0 | Not started | - |
+| 4. Multi-Medium Expansion | 4/4 | Complete | 2026-04-03 |
+| 5. Taste Profile and Polish | 0/6 | Planning complete | - |

@@ -19,6 +19,43 @@ export interface CanvasAISettings {
   imageSavePath: string;
 }
 
+/**
+ * Canvas color values accepted by Obsidian's node setData({ color }) API.
+ *
+ * Obsidian accepts: '1' through '6' (preset colors), '' (theme default),
+ * or a '#rrggbb' hex string. White is implemented as an explicit hex
+ * '#ffffff' (not '') so it renders consistently regardless of the user's
+ * Obsidian theme.
+ *
+ * Note on ordering: JavaScript objects sort numeric-string keys ('1'..'6')
+ * before non-numeric keys ('#ffffff'), so using a Record for dropdown
+ * construction would silently reorder the list. We use an ordered array
+ * as the canonical source and build the dropdown by calling addOption in
+ * a loop. NODE_COLOR_OPTIONS (the Record form) is kept for `in`-based
+ * validation of stored values — its iteration order is not load-bearing.
+ */
+export interface NodeColorOption {
+  value: string;
+  label: string;
+}
+
+export const NODE_COLOR_OPTIONS_ORDER: NodeColorOption[] = [
+  { value: '#ffffff', label: 'White (default)' },
+  { value: '1', label: 'Red' },
+  { value: '2', label: 'Orange' },
+  { value: '3', label: 'Yellow' },
+  { value: '4', label: 'Green' },
+  { value: '5', label: 'Cyan' },
+  { value: '6', label: 'Purple' },
+];
+
+export const NODE_COLOR_OPTIONS: Record<string, string> = Object.fromEntries(
+  NODE_COLOR_OPTIONS_ORDER.map(({ value, label }) => [value, label])
+);
+
+/** Default AI node color. Fresh installs get white; existing users keep their saved value. */
+export const DEFAULT_NODE_COLOR = '#ffffff';
+
 export const DEFAULT_SETTINGS: CanvasAISettings = {
   claudeApiKey: '',
   runwareApiKey: '',
@@ -26,7 +63,7 @@ export const DEFAULT_SETTINGS: CanvasAISettings = {
   debugMode: false,
   disabledCanvases: [],
   dailyTokenBudget: 500000,
-  aiNodeColor: '6',
+  aiNodeColor: DEFAULT_NODE_COLOR,
   tasteProfilePath: '.obsidian/plugins/canvas-ai/taste-profile.md',
   imageSavePath: 'canvas-ai-images',
 };

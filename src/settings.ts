@@ -1,6 +1,12 @@
 import { App, PluginSettingTab, Setting, Modal } from 'obsidian';
 import type CanvasAIPlugin from './main';
-import { TokenUsageData, DEFAULT_TOKEN_USAGE } from './types/settings';
+import {
+  TokenUsageData,
+  DEFAULT_TOKEN_USAGE,
+  NODE_COLOR_OPTIONS,
+  NODE_COLOR_OPTIONS_ORDER,
+  DEFAULT_NODE_COLOR,
+} from './types/settings';
 
 export class CanvasAISettingTab extends PluginSettingTab {
   plugin: CanvasAIPlugin;
@@ -129,26 +135,24 @@ export class CanvasAISettingTab extends PluginSettingTab {
     // --- AI Node Appearance Section (D-05, D-06) ---
     new Setting(containerEl).setName('AI Node Appearance').setHeading();
 
-    // Node color dropdown: options "1"-"6"
+    // Node color dropdown: White (default) + presets 1-6.
+    // Iterates NODE_COLOR_OPTIONS_ORDER via addOption so the array order is
+    // preserved — Obsidian's addOptions(Record) would re-sort numeric keys
+    // ('1'..'6') ahead of '#ffffff' due to a JS language quirk.
     new Setting(containerEl)
       .setName('Node color')
-      .setDesc('Canvas color preset for AI-generated nodes')
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOptions({
-            '1': 'Color 1 (Red)',
-            '2': 'Color 2 (Orange)',
-            '3': 'Color 3 (Yellow)',
-            '4': 'Color 4 (Green)',
-            '5': 'Color 5 (Cyan)',
-            '6': 'Color 6 (Purple)',
-          })
-          .setValue(this.plugin.settings.aiNodeColor.length <= 1 ? this.plugin.settings.aiNodeColor : '6')
-          .onChange(async (value) => {
-            this.plugin.settings.aiNodeColor = value;
-            await this.plugin.saveSettings();
-          })
-      );
+      .setDesc('Canvas color for AI-generated nodes')
+      .addDropdown((dropdown) => {
+        for (const { value, label } of NODE_COLOR_OPTIONS_ORDER) {
+          dropdown.addOption(value, label);
+        }
+        const current = this.plugin.settings.aiNodeColor;
+        dropdown.setValue(current in NODE_COLOR_OPTIONS ? current : DEFAULT_NODE_COLOR);
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.aiNodeColor = value;
+          await this.plugin.saveSettings();
+        });
+      });
 
     // --- Taste Profile Section (D-08, D-09, D-10) ---
     new Setting(containerEl).setName('Taste Profile').setHeading();

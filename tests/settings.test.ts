@@ -1,4 +1,13 @@
-import { DEFAULT_SETTINGS, CanvasAISettings, TokenUsageData, DEFAULT_TOKEN_USAGE, BUFFER_INTERVAL_MS } from '../src/types/settings';
+import {
+  DEFAULT_SETTINGS,
+  CanvasAISettings,
+  TokenUsageData,
+  DEFAULT_TOKEN_USAGE,
+  BUFFER_INTERVAL_MS,
+  NODE_COLOR_OPTIONS,
+  NODE_COLOR_OPTIONS_ORDER,
+  DEFAULT_NODE_COLOR,
+} from '../src/types/settings';
 
 describe('CanvasAISettings', () => {
   test('DEFAULT_SETTINGS has expected defaults', () => {
@@ -38,8 +47,40 @@ describe('CanvasAISettings', () => {
     expect(DEFAULT_SETTINGS.dailyTokenBudget).toBe(500000);
   });
 
-  test('DEFAULT_SETTINGS.aiNodeColor equals "6"', () => {
-    expect(DEFAULT_SETTINGS.aiNodeColor).toBe('6');
+  test('DEFAULT_SETTINGS.aiNodeColor equals DEFAULT_NODE_COLOR', () => {
+    expect(DEFAULT_SETTINGS.aiNodeColor).toBe(DEFAULT_NODE_COLOR);
+  });
+
+  test('DEFAULT_NODE_COLOR equals "#ffffff" (white)', () => {
+    expect(DEFAULT_NODE_COLOR).toBe('#ffffff');
+  });
+
+  test('NODE_COLOR_OPTIONS contains white with label starting with "White"', () => {
+    expect(NODE_COLOR_OPTIONS['#ffffff']).toBeDefined();
+    expect(NODE_COLOR_OPTIONS['#ffffff']).toMatch(/^White/);
+  });
+
+  test('NODE_COLOR_OPTIONS preserves all 6 legacy preset options', () => {
+    expect(NODE_COLOR_OPTIONS['1']).toBeDefined();
+    expect(NODE_COLOR_OPTIONS['2']).toBeDefined();
+    expect(NODE_COLOR_OPTIONS['3']).toBeDefined();
+    expect(NODE_COLOR_OPTIONS['4']).toBeDefined();
+    expect(NODE_COLOR_OPTIONS['5']).toBeDefined();
+    expect(NODE_COLOR_OPTIONS['6']).toBeDefined();
+  });
+
+  test('NODE_COLOR_OPTIONS_ORDER lists White first (dropdown order)', () => {
+    // JS objects re-order numeric keys, so ordering lives on the array form.
+    // The settings UI iterates NODE_COLOR_OPTIONS_ORDER to build the dropdown.
+    expect(NODE_COLOR_OPTIONS_ORDER[0].value).toBe('#ffffff');
+    expect(NODE_COLOR_OPTIONS_ORDER[0].label).toMatch(/^White/);
+  });
+
+  test('NODE_COLOR_OPTIONS_ORDER and NODE_COLOR_OPTIONS stay in sync', () => {
+    for (const { value, label } of NODE_COLOR_OPTIONS_ORDER) {
+      expect(NODE_COLOR_OPTIONS[value]).toBe(label);
+    }
+    expect(Object.keys(NODE_COLOR_OPTIONS).length).toBe(NODE_COLOR_OPTIONS_ORDER.length);
   });
 
   test('DEFAULT_SETTINGS.tasteProfilePath equals expected path', () => {

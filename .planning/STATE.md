@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-01-taste-profile-structure-PLAN.md
-last_updated: "2026-04-05T01:02:46.137Z"
+stopped_at: Completed 05-04-edge-aligned-placement-PLAN.md
+last_updated: "2026-04-05T01:06:52.951Z"
 last_activity: 2026-04-05
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 24
-  completed_plans: 20
+  completed_plans: 21
   percent: 25
 ---
 
@@ -69,6 +69,7 @@ Progress: [██░░░░░░░░] 25%
 | Phase 04 P03 | 4min | 2 tasks | 6 files |
 | Phase 05 P03 | 3min | 1 tasks | 1 files |
 | Phase 05 P01 | 5min | 3 tasks | 2 files |
+| Phase 05 P04 | 9min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -141,6 +142,9 @@ Recent decisions affecting current work:
 - [Phase 05]: [Phase 05]: Legacy-vs-nested detection uses top-level-only key check -- prevents indented 'tone:' sub-keys from being misclassified as flat
 - [Phase 05]: [Phase 05]: visual_preference legacy key maps to style.formatting (not style.voice) -- formatting is the correct conceptual bucket for visual aesthetics
 - [Phase 05]: [Phase 05]: TAST-04 (per-member profiles) deferred via file-level JSDoc in taste-profile.ts per D-08 -- single global profile for Phase 5
+- [Phase 05]: [Phase 05]: Edge-aligned placement replaces orbital fan — right-column stacking with slide-down before direction fallback (D-09/D-10/D-11/Pitfall 6)
+- [Phase 05]: [Phase 05]: Fallback obstacle filtering — Below/Left/Above exclude obstacles in the already-exhausted right column, so wide candidates that clip into the column don't spuriously block the fallback
+- [Phase 05]: [Phase 05]: computeEdgeAlignedPlacements accepts nodeSizes array — heterogeneous node-type sizing supported without re-running placement, enabling Phase 5 companion nodes
 
 ### Pending Todos
 
@@ -154,6 +158,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-05T01:02:46.135Z
-Stopped at: Completed 05-01-taste-profile-structure-PLAN.md
+Last session: 2026-04-05T01:06:52.948Z
+Stopped at: Completed 05-04-edge-aligned-placement-PLAN.md
 Resume file: None

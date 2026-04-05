@@ -1,17 +1,18 @@
 /**
- * Tests for collision-free orbital placement with directional scanning.
+ * Tests for edge-aligned placement with slide-down + clockwise fallback.
  *
- * Covers: D-09 (orbital placement), D-10 (directional fanning),
- * D-11 (gap enforcement), D-12 (outward scan), Pitfall 3 (bounded search),
+ * Covers: D-09 (right-edge alignment), D-10 (vertical stacking),
+ * D-11 (gap enforcement), Pitfall 6 (slide-down before direction fallback),
  * Pitfall 7 (canvas coordinates).
+ *
+ * Also keeps tests for preserved primitives: checkCollision and findOpenDirection.
  */
 
 import {
   checkCollision,
   findOpenDirection,
-  computeOrbitalPlacements,
+  computeEdgeAlignedPlacements,
   BoundingBox,
-  PlacementCoordinate,
 } from '../../src/spatial/placement';
 import { makeNode, resetNodeCounter } from './test-fixtures';
 
@@ -116,239 +117,170 @@ describe('findOpenDirection', () => {
   });
 });
 
-describe('computeOrbitalPlacements', () => {
-  it('should place 1 node at orbital distance from trigger with no obstacles', () => {
-    const trigger = makeNode({ id: 'trigger', x: 100, y: 100, width: 200, height: 100 });
-    const result = computeOrbitalPlacements(
+describe('computeEdgeAlignedPlacements (D-09, D-10, D-11)', () => {
+  it('places a single node at right edge + gap, top-aligned', () => {
+    const trigger = makeNode({ id: 't', x: 0, y: 0, width: 200, height: 100 });
+    const result = computeEdgeAlignedPlacements(
       trigger,
       1,
-      { width: 200, height: 100 },
+      [{ width: 300, height: 200 }],
       [trigger],
       40
     );
     expect(result).toHaveLength(1);
-
-    // Should be at least (max(200,100)/2 + 40 + 200/2) = 100 + 40 + 100 = 240px from trigger center
-    const triggerCenterX = trigger.x + trigger.width / 2;
-    const triggerCenterY = trigger.y + trigger.height / 2;
-    const placedCenterX = result[0].x + result[0].width / 2;
-    const placedCenterY = result[0].y + result[0].height / 2;
-    const dist = Math.sqrt(
-      Math.pow(placedCenterX - triggerCenterX, 2) +
-      Math.pow(placedCenterY - triggerCenterY, 2)
-    );
-    expect(dist).toBeGreaterThanOrEqual(200); // At minimum orbital distance
+    expect(result[0]).toEqual({ x: 240, y: 0, width: 300, height: 200 });
   });
 
-  it('should place exactly 3 nodes fanning out in an arc (D-10)', () => {
-    const trigger = makeNode({ id: 'trigger', x: 100, y: 100, width: 200, height: 100 });
-    const result = computeOrbitalPlacements(
+  it('stacks three nodes vertically at the same x (D-10)', () => {
+    const trigger = makeNode({ id: 't', x: 0, y: 0, width: 200, height: 100 });
+    const sizes = [
+      { width: 300, height: 200 },
+      { width: 300, height: 200 },
+      { width: 300, height: 200 },
+    ];
+    const result = computeEdgeAlignedPlacements(trigger, 3, sizes, [trigger], 40);
+    expect(result).toHaveLength(3);
+    expect(result[0]).toEqual({ x: 240, y: 0, width: 300, height: 200 });
+    expect(result[1]).toEqual({ x: 240, y: 240, width: 300, height: 200 });
+    expect(result[2]).toEqual({ x: 240, y: 480, width: 300, height: 200 });
+  });
+
+  it('respects heterogeneous node sizes for stack spacing', () => {
+    const trigger = makeNode({ id: 't', x: 0, y: 0, width: 200, height: 100 });
+    const sizes = [
+      { width: 300, height: 200 },
+      { width: 400, height: 250 },
+      { width: 512, height: 512 },
+    ];
+    const result = computeEdgeAlignedPlacements(trigger, 3, sizes, [trigger], 40);
+    expect(result[0].y).toBe(0);
+    expect(result[0].width).toBe(300);
+    expect(result[1].y).toBe(240); // 0 + 200 + 40
+    expect(result[1].width).toBe(400);
+    expect(result[2].y).toBe(530); // 240 + 250 + 40
+    expect(result[2].width).toBe(512);
+  });
+
+  it('slides down within the right column when first slot collides (Pitfall 6)', () => {
+    const trigger = makeNode({ id: 't', x: 0, y: 0, width: 200, height: 100 });
+    // Obstacle blocks the primary slot at (240, 0) but leaves space lower
+    const obstacle = makeNode({ id: 'o', x: 240, y: 0, width: 300, height: 200 });
+    const result = computeEdgeAlignedPlacements(
+      trigger,
+      1,
+      [{ width: 300, height: 200 }],
+      [trigger, obstacle],
+      40
+    );
+    expect(result[0].x).toBe(240); // same right column, slid down
+    expect(result[0].y).toBeGreaterThanOrEqual(240); // below obstacle + gap
+  });
+
+  it('falls back to BELOW trigger when right column is fully blocked', () => {
+    const trigger = makeNode({ id: 't', x: 0, y: 0, width: 200, height: 100 });
+    // Wall of obstacles blocking the entire right column up to y=2200
+    const wall = Array.from({ length: 12 }, (_, i) =>
+      makeNode({ id: `w${i}`, x: 240, y: i * 200, width: 300, height: 180 })
+    );
+    const result = computeEdgeAlignedPlacements(
+      trigger,
+      1,
+      [{ width: 300, height: 200 }],
+      [trigger, ...wall],
+      40
+    );
+    // Should fall back to below trigger: x = trigger.x = 0, y = trigger.y + trigger.height + gap = 140
+    expect(result[0].x).toBe(0);
+    expect(result[0].y).toBe(140);
+  });
+
+  it('falls back to LEFT when Right and Below are blocked', () => {
+    const trigger = makeNode({ id: 't', x: 1000, y: 500, width: 200, height: 100 });
+    const wallRight = Array.from({ length: 12 }, (_, i) =>
+      makeNode({ id: `wr${i}`, x: 1240, y: 500 + i * 200, width: 300, height: 180 })
+    );
+    const blockBelow = makeNode({ id: 'bb', x: 1000, y: 640, width: 300, height: 200 });
+    const result = computeEdgeAlignedPlacements(
+      trigger,
+      1,
+      [{ width: 300, height: 200 }],
+      [trigger, ...wallRight, blockBelow],
+      40
+    );
+    // Left: x = trigger.x - size.width - gap = 1000 - 300 - 40 = 660, y = trigger.y = 500
+    expect(result[0].x).toBe(660);
+    expect(result[0].y).toBe(500);
+  });
+
+  it('falls back to ABOVE when Right, Below, Left are blocked', () => {
+    const trigger = makeNode({ id: 't', x: 1000, y: 500, width: 200, height: 100 });
+    const wallRight = Array.from({ length: 12 }, (_, i) =>
+      makeNode({ id: `wr${i}`, x: 1240, y: 500 + i * 200, width: 300, height: 180 })
+    );
+    const blockBelow = makeNode({ id: 'bb', x: 1000, y: 640, width: 300, height: 200 });
+    const blockLeft = makeNode({ id: 'bl', x: 660, y: 500, width: 300, height: 200 });
+    const result = computeEdgeAlignedPlacements(
+      trigger,
+      1,
+      [{ width: 300, height: 200 }],
+      [trigger, ...wallRight, blockBelow, blockLeft],
+      40
+    );
+    // Above: x = trigger.x = 1000, y = trigger.y - size.height - gap = 500 - 200 - 40 = 260
+    expect(result[0].x).toBe(1000);
+    expect(result[0].y).toBe(260);
+  });
+
+  it('returns empty array for count=0', () => {
+    const trigger = makeNode({ id: 't', x: 0, y: 0, width: 200, height: 100 });
+    expect(computeEdgeAlignedPlacements(trigger, 0, [], [trigger], 40)).toEqual([]);
+  });
+
+  it('reuses last size when nodeSizes is shorter than count', () => {
+    const trigger = makeNode({ id: 't', x: 0, y: 0, width: 200, height: 100 });
+    const result = computeEdgeAlignedPlacements(
       trigger,
       3,
-      { width: 200, height: 100 },
+      [{ width: 300, height: 200 }],
       [trigger],
       40
     );
     expect(result).toHaveLength(3);
-
-    // Each placement should have valid coordinates
-    for (const p of result) {
-      expect(p.width).toBe(200);
-      expect(p.height).toBe(100);
-      expect(typeof p.x).toBe('number');
-      expect(typeof p.y).toBe('number');
-      expect(isNaN(p.x)).toBe(false);
-      expect(isNaN(p.y)).toBe(false);
-    }
+    expect(result.every((p) => p.width === 300)).toBe(true);
   });
 
-  it('should scan outward when placement is blocked by existing node (D-12)', () => {
-    const trigger = makeNode({ id: 'trigger', x: 500, y: 500, width: 200, height: 100 });
-    // Place blocking nodes around the trigger at the default orbital distance
-    const blockers = [
-      makeNode({ id: 'block-right', x: 740, y: 450, width: 200, height: 200 }),
-      makeNode({ id: 'block-left', x: 60, y: 450, width: 200, height: 200 }),
-    ];
-    const allNodes = [trigger, ...blockers];
-
-    const result = computeOrbitalPlacements(
+  it('excludes trigger node from collision check', () => {
+    const trigger = makeNode({ id: 't', x: 0, y: 0, width: 200, height: 100 });
+    // Only the trigger exists — primary slot should be clear
+    const result = computeEdgeAlignedPlacements(
       trigger,
       1,
-      { width: 200, height: 100 },
-      allNodes,
-      40
-    );
-    expect(result).toHaveLength(1);
-
-    // The result should not overlap any existing node
-    for (const existing of allNodes) {
-      const overlapX =
-        result[0].x < existing.x + existing.width + 40 &&
-        result[0].x + result[0].width > existing.x - 40;
-      const overlapY =
-        result[0].y < existing.y + existing.height + 40 &&
-        result[0].y + result[0].height > existing.y - 40;
-      if (overlapX && overlapY) {
-        // If both axes overlap, it's a collision -- this should not happen
-        // Exception: the trigger node itself is excluded from collision check
-        // Only fail if colliding with a non-trigger node
-        if (existing.id !== 'trigger') {
-          fail(`Placement at (${result[0].x}, ${result[0].y}) collides with ${existing.id}`);
-        }
-      }
-    }
-  });
-
-  it('should place at max radius when all nearby space is blocked (D-12 fallback)', () => {
-    const trigger = makeNode({ id: 'trigger', x: 500, y: 500, width: 200, height: 100 });
-    // Create a dense ring of blockers around the trigger
-    const blockers = [];
-    for (let angle = 0; angle < 360; angle += 30) {
-      const rad = (angle * Math.PI) / 180;
-      const bx = 500 + Math.cos(rad) * 300 - 100;
-      const by = 500 + Math.sin(rad) * 300 - 75;
-      blockers.push(
-        makeNode({
-          id: `blocker-${angle}`,
-          x: Math.round(bx),
-          y: Math.round(by),
-          width: 200,
-          height: 150,
-        })
-      );
-    }
-    const allNodes = [trigger, ...blockers];
-
-    const result = computeOrbitalPlacements(
-      trigger,
-      1,
-      { width: 200, height: 100 },
-      allNodes,
-      40
-    );
-    // Should still return exactly 1 placement (at max radius)
-    expect(result).toHaveLength(1);
-  });
-
-  it('should never produce placements that overlap existing nodes', () => {
-    const trigger = makeNode({ id: 'trigger', x: 300, y: 300, width: 200, height: 100 });
-    const neighbors = [
-      makeNode({ id: 'n1', x: 540, y: 280, width: 200, height: 100 }),
-      makeNode({ id: 'n2', x: 300, y: 440, width: 200, height: 100 }),
-      makeNode({ id: 'n3', x: 60, y: 280, width: 200, height: 100 }),
-    ];
-    const allNodes = [trigger, ...neighbors];
-
-    const result = computeOrbitalPlacements(
-      trigger,
-      3,
-      { width: 200, height: 100 },
-      allNodes,
-      40
-    );
-    expect(result).toHaveLength(3);
-
-    // Verify no placement collides with any non-trigger existing node
-    for (const placement of result) {
-      for (const existing of neighbors) {
-        const gapX = Math.max(
-          existing.x - (placement.x + placement.width),
-          placement.x - (existing.x + existing.width)
-        );
-        const gapY = Math.max(
-          existing.y - (placement.y + placement.height),
-          placement.y - (existing.y + existing.height)
-        );
-        // If both gaps are negative, there's an overlap
-        if (gapX < 0 && gapY < 0) {
-          fail(
-            `Placement at (${placement.x}, ${placement.y}) overlaps with ${existing.id} at (${existing.x}, ${existing.y})`
-          );
-        }
-      }
-    }
-  });
-
-  it('should maintain gap from existing nodes (D-11)', () => {
-    const trigger = makeNode({ id: 'trigger', x: 300, y: 300, width: 200, height: 100 });
-    const neighbor = makeNode({ id: 'near', x: 540, y: 280, width: 200, height: 100 });
-    const allNodes = [trigger, neighbor];
-    const gap = 40;
-
-    const result = computeOrbitalPlacements(
-      trigger,
-      2,
-      { width: 200, height: 100 },
-      allNodes,
-      gap
-    );
-
-    // Each placement should maintain at least `gap` distance from `neighbor`
-    for (const placement of result) {
-      // Compute minimum separation on each axis
-      const sepX = Math.max(
-        neighbor.x - (placement.x + placement.width),
-        placement.x - (neighbor.x + neighbor.width)
-      );
-      const sepY = Math.max(
-        neighbor.y - (placement.y + placement.height),
-        placement.y - (neighbor.y + neighbor.height)
-      );
-
-      // If they overlap on one axis, the other axis must have at least gap separation
-      // If they overlap on both axes, that's a collision (handled by collision test above)
-      // If separated on at least one axis, that axis separation should be >= 0
-      // The gap is enforced through the collision check with expanded bounding boxes
-      if (sepX < 0 && sepY < 0) {
-        fail(`Placement at (${placement.x}, ${placement.y}) overlaps with neighbor`);
-      }
-    }
-  });
-
-  it('should return coordinates in canvas space, not viewport coordinates (Pitfall 7)', () => {
-    const trigger = makeNode({ id: 'trigger', x: 5000, y: 5000, width: 200, height: 100 });
-    const result = computeOrbitalPlacements(
-      trigger,
-      1,
-      { width: 200, height: 100 },
+      [{ width: 300, height: 200 }],
       [trigger],
       40
     );
-
-    // Coordinates should be near the trigger node (in canvas space)
-    // NOT transformed to viewport/screen coordinates
-    const placedCenter = {
-      x: result[0].x + result[0].width / 2,
-      y: result[0].y + result[0].height / 2,
-    };
-    const triggerCenter = {
-      x: trigger.x + trigger.width / 2,
-      y: trigger.y + trigger.height / 2,
-    };
-
-    // The placement should be within a reasonable radius of the trigger
-    const dist = Math.sqrt(
-      Math.pow(placedCenter.x - triggerCenter.x, 2) +
-      Math.pow(placedCenter.y - triggerCenter.y, 2)
-    );
-    // Max orbital distance should be starting_radius * maxSearchRadius = ~240 * 5 = 1200
-    expect(dist).toBeLessThan(1500);
-    // And definitely near the trigger, not near (0,0)
-    expect(result[0].x).toBeGreaterThan(4000);
-    expect(result[0].y).toBeGreaterThan(4000);
+    expect(result[0].x).toBe(240);
+    expect(result[0].y).toBe(0);
   });
 
-  it('should return exactly count PlacementCoordinate items', () => {
-    const trigger = makeNode({ id: 'trigger', x: 0, y: 0, width: 200, height: 100 });
-    for (const count of [1, 2, 3, 5]) {
-      const result = computeOrbitalPlacements(
-        trigger,
-        count,
-        { width: 150, height: 80 },
-        [trigger],
-        40
-      );
-      expect(result).toHaveLength(count);
+  it('prevents overlap between sibling placements in the same call', () => {
+    const trigger = makeNode({ id: 't', x: 0, y: 0, width: 200, height: 100 });
+    const result = computeEdgeAlignedPlacements(
+      trigger,
+      3,
+      [{ width: 300, height: 200 }],
+      [trigger],
+      40
+    );
+    // Pairwise no-overlap assertion
+    for (let i = 0; i < result.length; i++) {
+      for (let j = i + 1; j < result.length; j++) {
+        const a = result[i];
+        const b = result[j];
+        const overlapX = a.x < b.x + b.width && a.x + a.width > b.x;
+        const overlapY = a.y < b.y + b.height && a.y + a.height > b.y;
+        expect(overlapX && overlapY).toBe(false);
+      }
     }
   });
 });

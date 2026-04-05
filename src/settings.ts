@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, Modal } from 'obsidian';
 import type CanvasAIPlugin from './main';
 import { TokenUsageData, DEFAULT_TOKEN_USAGE } from './types/settings';
 
@@ -168,7 +168,7 @@ export class CanvasAISettingTab extends PluginSettingTab {
         })
       );
 
-    // Reset to default button
+    // Reset to default button (TAST-05, D-07) — confirmation modal gates the destructive action
     new Setting(containerEl)
       .setName('Reset taste profile')
       .setDesc('Reset to the default taste profile')
@@ -176,8 +176,10 @@ export class CanvasAISettingTab extends PluginSettingTab {
         button
           .setButtonText('Reset to default')
           .setWarning()
-          .onClick(async () => {
-            await (this.plugin as any).resetTasteProfile();
+          .onClick(() => {
+            new ResetTasteProfileConfirmModal(this.app, async () => {
+              await (this.plugin as any).resetTasteProfile();
+            }).open();
           })
       );
 
@@ -244,5 +246,53 @@ export class CanvasAISettingTab extends PluginSettingTab {
       descEl.addClass('canvas-ai-valid');
       descEl.removeClass('canvas-ai-invalid');
     }
+  }
+}
+
+/**
+ * Confirmation dialog shown before resetting the taste profile (TAST-05, D-07, UI-SPEC Destructive Actions).
+ *
+ * Copy matches 05-UI-SPEC.md lines 198-201 verbatim. See that file for the canonical strings
+ * (title, body, confirm, dismiss). Do not reword without updating UI-SPEC first.
+ */
+class ResetTasteProfileConfirmModal extends Modal {
+  private readonly onConfirmCallback: () => void | Promise<void>;
+
+  constructor(app: App, onConfirm: () => void | Promise<void>) {
+    super(app);
+    this.onConfirmCallback = onConfirm;
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+
+    contentEl.createEl('h2', { text: 'Reset taste profile' });
+    contentEl.createEl('p', {
+      text: 'This will replace your current taste profile with the default. Your existing preferences will be lost. Continue?',
+    });
+
+    new Setting(contentEl)
+      .addButton((btn) =>
+        btn.setButtonText('Keep my profile').onClick(() => {
+          this.close();
+        })
+      )
+      .addButton((btn) =>
+        btn
+          .setButtonText('Reset')
+          .setWarning()
+          .onClick(async () => {
+            try {
+              await this.onConfirmCallback();
+            } finally {
+              this.close();
+            }
+          })
+      );
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
   }
 }

@@ -70,7 +70,7 @@
 - [ ] **TAST-04**: Per-team-member profiles supported (each user has their own file)
 - [x] **TAST-05**: Taste profile editable through settings UI or by editing the file directly
 - [x] **TAST-06**: Structured separation of style (how to communicate) vs substance (what to communicate)
-- [ ] **TAST-07**: Counter-sycophancy instructions in system prompt prevent taste profile from suppressing novelty
+- [x] **TAST-07**: Counter-sycophancy instructions in system prompt prevent taste profile from suppressing novelty
 
 ## v2 Requirements
 
@@ -161,7 +161,7 @@
 | TAST-04 | Phase 5 | Pending |
 | TAST-05 | Phase 5 | Complete |
 | TAST-06 | Phase 5 | Complete |
-| TAST-07 | Phase 5 | Pending |
+| TAST-07 | Phase 5 | Complete |
 
 **Coverage:**
 - v1 requirements: 52 total

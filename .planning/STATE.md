@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-04-edge-aligned-placement-PLAN.md
-last_updated: "2026-04-05T01:06:52.951Z"
+stopped_at: Completed 05-02-counter-sycophancy-prompt-PLAN.md
+last_updated: "2026-04-05T01:16:55.772Z"
 last_activity: 2026-04-05
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 24
-  completed_plans: 21
+  completed_plans: 22
   percent: 25
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 05 (taste-profile-and-polish) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-04-05
 
@@ -70,6 +70,7 @@ Progress: [██░░░░░░░░] 25%
 | Phase 05 P03 | 3min | 1 tasks | 1 files |
 | Phase 05 P01 | 5min | 3 tasks | 2 files |
 | Phase 05 P04 | 9min | 2 tasks | 5 files |
+| Phase 05 P02 | 2min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -145,6 +146,9 @@ Recent decisions affecting current work:
 - [Phase 05]: [Phase 05]: Edge-aligned placement replaces orbital fan — right-column stacking with slide-down before direction fallback (D-09/D-10/D-11/Pitfall 6)
 - [Phase 05]: [Phase 05]: Fallback obstacle filtering — Below/Left/Above exclude obstacles in the already-exhausted right column, so wide candidates that clip into the column don't spuriously block the fallback
 - [Phase 05]: [Phase 05]: computeEdgeAlignedPlacements accepts nodeSizes array — heterogeneous node-type sizing supported without re-running placement, enabling Phase 5 companion nodes
+- [Phase 05]: Counter-sycophancy hardcoded into GENERATION_INSTRUCTIONS per D-04 -- no settings toggle, product-committed behavior
+- [Phase 05]: Permissive timing language ('occasionally', 'use your judgment', 'when appropriate') over imperatives -- D-06 probabilistic, Pitfall 2 hostile-AI avoidance
+- [Phase 05]: Anti-meta-narration directive -- Claude must not flag 'playing devil's advocate' so pushback feels organic, not performative
 
 ### Pending Todos
 
@@ -158,6 +162,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-05T01:06:52.948Z
-Stopped at: Completed 05-04-edge-aligned-placement-PLAN.md
+Last session: 2026-04-05T01:16:55.770Z
+Stopped at: Completed 05-02-counter-sycophancy-prompt-PLAN.md
 Resume file: None

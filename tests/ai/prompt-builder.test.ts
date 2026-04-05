@@ -1,9 +1,15 @@
 import {
   buildSystemPrompt,
   buildUserMessage,
+  buildIterationUserMessage,
   GENERATION_INSTRUCTIONS,
   SystemPromptBlock,
 } from '../../src/ai/prompt-builder';
+import type {
+  IterationContext,
+  IterationSource,
+} from '../../src/canvas/iteration-detector';
+import type { CanvasNodeInfo } from '../../src/types/canvas';
 
 describe('prompt-builder', () => {
   const mockTasteContent = 'Tone: Restrained\nDepth: Deep structural analysis\n\nWe believe design begins with restraint.';
@@ -206,6 +212,260 @@ describe('prompt-builder', () => {
       const blocks = buildSystemPrompt('Tone: Restrained', 'spatial narrative');
       expect(blocks[0].text).toContain('## Explicit User Requests');
       expect(blocks[0].cache_control).toEqual({ type: 'ephemeral' });
+    });
+  });
+
+  // Iteration feature (Phase 5 gap closure): user draws an edge from an
+  // AI-generated node to a new text node, writes instructions in the text
+  // node, and expects an iterated version of the same type. The iteration
+  // content lives in the user message (dynamic), NOT the cached system block.
+  describe('buildIterationUserMessage (Phase 5 iteration feature)', () => {
+    function makeNode(id: string, overrides: Partial<CanvasNodeInfo> = {}): CanvasNodeInfo {
+      return {
+        id,
+        type: 'text',
+        x: 0,
+        y: 0,
+        width: 300,
+        height: 200,
+        content: '',
+        ...overrides,
+      };
+    }
+
+    function makeSource(
+      overrides: Partial<IterationSource> & { type: IterationSource['type'] }
+    ): IterationSource {
+      return {
+        node: makeNode('ai-' + overrides.type),
+        content: 'source content',
+        createdIndex: 0,
+        ...overrides,
+      };
+    }
+
+    function makeContext(
+      primary: IterationSource,
+      additional: IterationSource[] = [],
+      instructions: string = 'do the iteration'
+    ): IterationContext {
+      return {
+        primarySource: primary,
+        additionalSources: additional,
+        triggerTextNode: makeNode('trigger', { content: instructions }),
+        userInstructions: instructions,
+        targetType: primary.type,
+        targetLang: primary.lang,
+      };
+    }
+
+    // ---------- Single-source variants ----------
+
+    test('code source: includes fenced code block with lang, targets <node type="code" lang="...">', () => {
+      const ctx = makeContext(
+        makeSource({
+          type: 'code',
+          content: 'const x = 1;',
+          lang: 'typescript',
+        }),
+        [],
+        'add a type annotation'
+      );
+      const msg = buildIterationUserMessage(ctx);
+      expect(msg).toContain('```typescript');
+      expect(msg).toContain('const x = 1;');
+      expect(msg).toContain('add a type annotation');
+      expect(msg).toContain('<node type="code"');
+      expect(msg).toContain('lang="typescript"');
+    });
+
+    test('code source without lang: targets <node type="code"> with empty fence', () => {
+      const ctx = makeContext(
+        makeSource({ type: 'code', content: 'raw code', lang: undefined }),
+        [],
+        'refactor'
+      );
+      const msg = buildIterationUserMessage(ctx);
+      expect(msg).toContain('<node type="code">');
+      // Should not invent a lang attribute
+      expect(msg).not.toContain('lang="undefined"');
+      expect(msg).not.toContain('lang=""');
+    });
+
+    test('text source: includes raw content, targets <node type="text">', () => {
+      const ctx = makeContext(
+        makeSource({
+          type: 'text',
+          content: 'A reflective paragraph about design.',
+        }),
+        [],
+        'rewrite in the style of cormac mccarthy'
+      );
+      const msg = buildIterationUserMessage(ctx);
+      expect(msg).toContain('A reflective paragraph about design.');
+      expect(msg).toContain('rewrite in the style of cormac mccarthy');
+      expect(msg).toContain('<node type="text">');
+    });
+
+    test('mermaid source: includes mermaid fenced block, targets <node type="mermaid">', () => {
+      const ctx = makeContext(
+        makeSource({
+          type: 'mermaid',
+          content: 'graph TD\n  A --> B',
+        }),
+        [],
+        'add a cache node'
+      );
+      const msg = buildIterationUserMessage(ctx);
+      expect(msg).toContain('```mermaid');
+      expect(msg).toContain('graph TD');
+      expect(msg).toContain('<node type="mermaid">');
+    });
+
+    test('image source: frames as image iteration, targets <node type="image">', () => {
+      const ctx = makeContext(
+        makeSource({
+          type: 'image',
+          content: 'canvas-ai-images/2026-04-05_abc.png',
+        }),
+        [],
+        'make it at dusk with warm lighting'
+      );
+      const msg = buildIterationUserMessage(ctx);
+      expect(msg).toContain('<node type="image">');
+      // Should reference the file path somewhere as the source
+      expect(msg.toLowerCase()).toContain('image');
+      // Tell Claude to infer visual intent from instructions (no persisted prompt)
+      expect(msg.toLowerCase()).toMatch(/visual|infer|scene|describe/);
+    });
+
+    // ---------- Universal assertions ----------
+
+    test('all variants reference "iteration" explicitly (not a fresh generation)', () => {
+      const types: Array<IterationSource['type']> = ['code', 'text', 'mermaid', 'image'];
+      for (const type of types) {
+        const ctx = makeContext(
+          makeSource({
+            type,
+            content: type === 'code' ? 'x = 1' : 'content',
+            lang: type === 'code' ? 'python' : undefined,
+          })
+        );
+        const msg = buildIterationUserMessage(ctx).toLowerCase();
+        expect(msg).toContain('iteration');
+      }
+    });
+
+    test('all variants reference the explicit-request override from GENERATION_INSTRUCTIONS', () => {
+      const ctx = makeContext(
+        makeSource({ type: 'code', content: 'x', lang: 'js' })
+      );
+      const msg = buildIterationUserMessage(ctx).toLowerCase();
+      expect(msg).toContain('explicit');
+    });
+
+    test('all variants include the user instructions verbatim', () => {
+      const ctx = makeContext(
+        makeSource({ type: 'text', content: 'orig' }),
+        [],
+        'VERY-SPECIFIC-MARKER-STRING-xyz123'
+      );
+      expect(buildIterationUserMessage(ctx)).toContain('VERY-SPECIFIC-MARKER-STRING-xyz123');
+    });
+
+    test('all variants tell Claude to emit ONLY the target type, not other mediums', () => {
+      const ctx = makeContext(
+        makeSource({ type: 'code', content: 'x', lang: 'js' })
+      );
+      const msg = buildIterationUserMessage(ctx).toLowerCase();
+      // Must communicate "single node only" somehow
+      expect(msg).toMatch(/single|only|exactly one|not emit|do not/);
+    });
+
+    // ---------- Multi-source merge ----------
+
+    test('multi-source: includes primary section AND additional sources section', () => {
+      const primary = makeSource({
+        type: 'code',
+        content: 'function counter() {}',
+        lang: 'javascript',
+      });
+      const additional = [
+        makeSource({
+          type: 'code',
+          content: 'function debounce() {}',
+          lang: 'typescript',
+          node: makeNode('ai2'),
+        }),
+      ];
+      const ctx = makeContext(primary, additional, 'combine these into a debounced counter');
+      const msg = buildIterationUserMessage(ctx);
+      expect(msg.toLowerCase()).toContain('primary');
+      expect(msg.toLowerCase()).toContain('additional');
+      expect(msg).toContain('function counter()');
+      expect(msg).toContain('function debounce()');
+      expect(msg).toContain('combine these into a debounced counter');
+    });
+
+    test('multi-source: each additional source labeled with its type', () => {
+      const primary = makeSource({
+        type: 'code',
+        content: 'code body',
+        lang: 'js',
+      });
+      const additional = [
+        makeSource({
+          type: 'text',
+          content: 'text body',
+          node: makeNode('ai2'),
+        }),
+        makeSource({
+          type: 'mermaid',
+          content: 'graph TD\nX-->Y',
+          node: makeNode('ai3'),
+        }),
+      ];
+      const ctx = makeContext(primary, additional, 'synthesize');
+      const msg = buildIterationUserMessage(ctx);
+      expect(msg).toContain('text body');
+      expect(msg).toContain('graph TD');
+      // Each additional source's type surfaces somewhere (label, header, or block tag)
+      expect(msg).toContain('text');
+      expect(msg).toContain('mermaid');
+    });
+
+    test('multi-source still specifies a SINGLE target type matching primary', () => {
+      const primary = makeSource({
+        type: 'mermaid',
+        content: 'graph TD\nX-->Y',
+      });
+      const additional = [
+        makeSource({
+          type: 'code',
+          content: 'some code',
+          lang: 'python',
+          node: makeNode('ai2'),
+        }),
+      ];
+      const ctx = makeContext(primary, additional, 'merge');
+      const msg = buildIterationUserMessage(ctx);
+      expect(msg).toContain('<node type="mermaid">');
+      // Should not ask for a code output since primary is mermaid
+      expect(msg).not.toContain('<node type="code"');
+    });
+
+    // ---------- Cache discipline ----------
+
+    test('buildIterationUserMessage does not affect buildSystemPrompt output (cache preserved)', () => {
+      const before = buildSystemPrompt('taste content', 'spatial narrative');
+      const ctx = makeContext(
+        makeSource({ type: 'code', content: 'x', lang: 'js' })
+      );
+      buildIterationUserMessage(ctx);
+      const after = buildSystemPrompt('taste content', 'spatial narrative');
+      expect(after[0].text).toBe(before[0].text);
+      expect(after[1].text).toBe(before[1].text);
+      expect(after[0].cache_control).toEqual(before[0].cache_control);
     });
   });
 

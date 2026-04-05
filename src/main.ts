@@ -12,14 +12,16 @@ import { CANVAS_EVENT_TYPES } from './canvas/canvas-events';
 import type { CanvasEvent } from './canvas/canvas-events';
 import { createClaudeClient, classifyApiError, getRetryDelay, getMaxRetries } from './ai/claude-client';
 import type { ApiErrorType } from './ai/claude-client';
-import { buildSystemPrompt, buildUserMessage } from './ai/prompt-builder';
+import { buildSystemPrompt, buildUserMessage, buildIterationUserMessage } from './ai/prompt-builder';
 import type { SystemPromptBlock } from './ai/prompt-builder';
 import { streamIntoNode } from './ai/stream-handler';
 import type { StreamResult } from './ai/stream-handler';
 import { isBudgetExceeded, trackTokens, getOrResetUsage } from './ai/token-budget';
 import { readTasteProfile, seedTasteProfile, formatTasteForPrompt, DEFAULT_TASTE_PROFILE } from './taste/taste-profile';
-import { buildSpatialContext } from './spatial';
+import { buildSpatialContext, computeIterationPlacement } from './spatial';
 import type { PlacementCoordinate } from './spatial';
+import { detectIterationContext } from './canvas/iteration-detector';
+import type { IterationContext } from './canvas/iteration-detector';
 import type { TypedNodeMeta } from './types/generation';
 import { RunwareImageClient } from './image/runware-client';
 import { ImageSaver } from './image/image-saver';
@@ -263,7 +265,21 @@ export default class CanvasAIPlugin extends Plugin {
       const triggerNode = nodes.find(n => n.id === effectiveTriggerNodeId);
       if (triggerNode && !triggerNode.content.trim()) return;
 
-      // 5. Build spatial context (Phase 2)
+      // 4b. Detect iteration request: is this trigger an edit on a text node
+      // with incoming edges from AI-created nodes? If so, the trigger is an
+      // "iterate on the linked source" request rather than a fresh generation.
+      // When `iteration` is null, the non-iteration flow runs unchanged.
+      const iteration: IterationContext | null = detectIterationContext({
+        triggerNodeId: effectiveTriggerNodeId,
+        nodes,
+        edges,
+        aiNodeIds: this.aiNodeIds,
+      });
+
+      // 5. Build spatial context (Phase 2). The trigger text node remains the
+      // "active node" in the narrative even in iteration mode — spatial
+      // relationships belong in block 2 (dynamic). Iteration source content
+      // enters via the user message (also dynamic), keeping block 1 cached.
       const spatialCtx = buildSpatialContext(nodes, edges, effectiveTriggerNodeId);
 
       // 6. Read taste profile (TAST-01, TAST-03)
@@ -275,7 +291,33 @@ export default class CanvasAIPlugin extends Plugin {
 
       // 7. Build system prompt (GENP-06, GENP-08)
       const systemPrompt = buildSystemPrompt(tasteContent, spatialCtx.narrative);
-      const userMessage = buildUserMessage();
+
+      // 7b. Choose user message + placements + type cap based on iteration mode
+      let userMessage: string;
+      let placements: PlacementCoordinate[];
+      let preSeededTypes: Set<string> | undefined;
+
+      if (iteration) {
+        console.log(
+          `[Canvas AI] iteration detected: primary=${iteration.primarySource.type}` +
+            `${iteration.primarySource.lang ? '/' + iteration.primarySource.lang : ''}, ` +
+            `additional=${iteration.additionalSources.length}, ` +
+            `targetType=${iteration.targetType}`
+        );
+        userMessage = buildIterationUserMessage(iteration);
+        const targetSize = NODE_SIZES[iteration.targetType] ?? NODE_SIZES.text;
+        placements = [
+          computeIterationPlacement(iteration.primarySource.node, targetSize, nodes),
+        ];
+        // Pre-seed seenTypes so Claude can only create the target type.
+        // Defense-in-depth: the prompt also instructs single-medium output.
+        const ALL_TYPES = ['code', 'text', 'mermaid', 'image'] as const;
+        preSeededTypes = new Set(ALL_TYPES.filter(t => t !== iteration.targetType));
+      } else {
+        userMessage = buildUserMessage();
+        placements = spatialCtx.placementSuggestions;
+        preSeededTypes = undefined;
+      }
 
       // 8. Set thinking state
       this.setLastTriggerTime(new Date());
@@ -285,7 +327,7 @@ export default class CanvasAIPlugin extends Plugin {
 
       // 9. Stream response with sequential multi-node support (D-01, D-02, D-03)
       const result = await this.streamWithRetry(
-        canvas, systemPrompt, userMessage, signal, spatialCtx.placementSuggestions
+        canvas, systemPrompt, userMessage, signal, placements, preSeededTypes
       );
 
       if (!result || signal.aborted) return;
@@ -324,7 +366,8 @@ export default class CanvasAIPlugin extends Plugin {
     systemPrompt: SystemPromptBlock[],
     userMessage: string,
     signal: AbortSignal,
-    placements: PlacementCoordinate[]
+    placements: PlacementCoordinate[],
+    preSeededTypes?: Set<string>
   ): Promise<StreamResult | null> {
     let attempt = 0;
 
@@ -333,7 +376,10 @@ export default class CanvasAIPlugin extends Plugin {
         let activeNode: any = null;
         let activeNodeMeta: TypedNodeMeta | null = null;
         let placementIndex = 0;
-        const seenTypes = new Set<string>();
+        // Pre-seed with blocked types for iteration mode so Claude cannot emit
+        // node types other than the iteration target. Defense-in-depth alongside
+        // the prompt's explicit single-medium instruction.
+        const seenTypes = new Set<string>(preSeededTypes);
         let mermaidBuffer = '';
         let isBufferingMermaid = false;
         // Track the latest flushed code content so the stream-completion

@@ -189,16 +189,25 @@ export function computeEdgeAlignedPlacements(
   count: number,
   nodeSizes: Array<{ width: number; height: number }>,
   existingNodes: CanvasNodeInfo[],
-  gap: number = DEFAULT_SPATIAL_CONFIG.placementGap
+  gap: number = DEFAULT_SPATIAL_CONFIG.placementGap,
+  anchorNode?: CanvasNodeInfo
 ): PlacementCoordinate[] {
   if (count <= 0) return [];
 
   const placements: PlacementCoordinate[] = [];
   const fallbackSize = { width: 300, height: 200 };
 
-  // Exclude trigger from collision set (per legacy orbital pattern)
+  // The node that placements anchor to for math (right-edge, below, etc.)
+  // defaults to the trigger but can be overridden via the anchorNode param.
+  const positionAnchor = anchorNode ?? triggerNode;
+
+  // Exclude BOTH the trigger and the anchor from the collision set.
+  // - trigger: legacy behavior, the user just edited it
+  // - anchor: if provided and distinct, it is by definition "under" the
+  //   placement math and would spuriously block every candidate slot
+  const excludedIds = new Set<string>([triggerNode.id, positionAnchor.id]);
   const existingBoxes: BoundingBox[] = existingNodes
-    .filter((n) => n.id !== triggerNode.id)
+    .filter((n) => !excludedIds.has(n.id))
     .map((n) => ({ x: n.x, y: n.y, width: n.width, height: n.height }));
 
   const resolveSize = (i: number) =>
@@ -218,11 +227,73 @@ export function computeEdgeAlignedPlacements(
       })),
     ];
 
-    const placement = findEdgeAlignedSlot(triggerNode, size, allBoxes, gap, placements);
+    const placement = findEdgeAlignedSlot(positionAnchor, size, allBoxes, gap, placements);
     placements.push(placement);
   }
 
   return placements;
+}
+
+/**
+ * Compute placement for a single iteration output anchored directly below
+ * a primary source node (same column, new row). Used by the Phase 5
+ * iteration feature.
+ *
+ * Contract:
+ *  - new node is placed at (source.x, source.y + source.height + gap)
+ *  - if that slot is occupied (continuous iteration — the Nth iteration
+ *    stacks below the (N-1)th), slide DOWN in gap-sized steps until a
+ *    free slot is found
+ *  - the source node itself is excluded from collision detection
+ *  - any obstacle strictly to the right of the source's right edge + gap
+ *    is considered non-blocking (e.g. the source's companion render node
+ *    lives in the right column and should not block left-column stacking)
+ *
+ * Unlike computeEdgeAlignedPlacements, this helper does not fall back to
+ * below/left/above directions — iteration is a single-column vertical
+ * stack by design, and falling back to other directions would scatter
+ * version history across the canvas.
+ */
+export function computeIterationPlacement(
+  sourceNode: CanvasNodeInfo,
+  newNodeSize: { width: number; height: number },
+  existingNodes: CanvasNodeInfo[],
+  gap: number = DEFAULT_SPATIAL_CONFIG.placementGap
+): PlacementCoordinate {
+  // Exclude the source itself from collision (it's "under" the new placement).
+  // Also exclude any node strictly to the right of the source's right edge +
+  // gap — this is the companion render column, which should not block
+  // left-column iteration stacking.
+  const rightColumnStart = sourceNode.x + sourceNode.width + gap;
+  const obstacles: BoundingBox[] = existingNodes
+    .filter((n) => n.id !== sourceNode.id)
+    .filter((n) => n.x < rightColumnStart)
+    .map((n) => ({ x: n.x, y: n.y, width: n.width, height: n.height }));
+
+  const candidateBase = {
+    x: sourceNode.x,
+    width: newNodeSize.width,
+    height: newNodeSize.height,
+  };
+
+  // Start directly below the source with gap; slide down if collision.
+  let y = sourceNode.y + sourceNode.height + gap;
+  const slideCeiling =
+    sourceNode.y + sourceNode.height + Math.max(newNodeSize.height * 20, 4000);
+
+  while (y <= slideCeiling) {
+    const candidate: BoundingBox = { ...candidateBase, y };
+    if (!checkCollision(candidate, obstacles, gap)) {
+      return { ...candidateBase, y };
+    }
+    // Advance by the step size of the new node; this guarantees forward
+    // progress past any iteration of the same size stacked above.
+    y += newNodeSize.height + gap;
+  }
+
+  // Ceiling reached — return the last attempted position as a last-resort
+  // fallback (same semantics as computeEdgeAlignedPlacements' final fallback).
+  return { ...candidateBase, y };
 }
 
 /**

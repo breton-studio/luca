@@ -12,6 +12,7 @@ import {
   checkCollision,
   findOpenDirection,
   computeEdgeAlignedPlacements,
+  computeIterationPlacement,
   BoundingBox,
 } from '../../src/spatial/placement';
 import { makeNode, resetNodeCounter } from './test-fixtures';
@@ -282,5 +283,169 @@ describe('computeEdgeAlignedPlacements (D-09, D-10, D-11)', () => {
         expect(overlapX && overlapY).toBe(false);
       }
     }
+  });
+});
+
+// Phase 5 iteration feature: computeIterationPlacement anchors a new node
+// directly below a primary source (same x as source, y = source.y +
+// source.height + gap). For continuous iteration, the slide-down algorithm
+// skips past any existing iterations so the nth iteration lands below the
+// (n-1)th, producing a vertical version-history column.
+describe('computeIterationPlacement (Phase 5 iteration)', () => {
+  it('places the new node directly below the source with gap, same x', () => {
+    const source = makeNode({ id: 'src', x: 100, y: 100, width: 400, height: 250 });
+    const result = computeIterationPlacement(
+      source,
+      { width: 400, height: 250 },
+      [source],
+      40
+    );
+    expect(result.x).toBe(100);
+    expect(result.y).toBe(100 + 250 + 40); // source.y + source.height + gap
+    expect(result.width).toBe(400);
+    expect(result.height).toBe(250);
+  });
+
+  it('uses the new node size, not the source size, for width/height', () => {
+    const source = makeNode({ id: 'src', x: 0, y: 0, width: 512, height: 512 });
+    const newSize = { width: 300, height: 200 };
+    const result = computeIterationPlacement(source, newSize, [source], 40);
+    expect(result.width).toBe(300);
+    expect(result.height).toBe(200);
+  });
+
+  it('does not count the source itself as a collision obstacle', () => {
+    const source = makeNode({ id: 'src', x: 0, y: 0, width: 400, height: 250 });
+    // Only the source is in existingNodes; placement should succeed below it
+    const result = computeIterationPlacement(
+      source,
+      { width: 400, height: 250 },
+      [source],
+      40
+    );
+    // No collision → primary slot returned
+    expect(result.y).toBe(250 + 40);
+  });
+
+  it('slides down past an existing iteration in the direct slot (continuous iteration)', () => {
+    const source = makeNode({ id: 'src', x: 0, y: 0, width: 400, height: 250 });
+    // Simulate first iteration already in place, directly below source
+    const firstIteration = makeNode({
+      id: 'iter1',
+      x: 0,
+      y: 250 + 40, // source.y + source.height + gap
+      width: 400,
+      height: 250,
+    });
+    const result = computeIterationPlacement(
+      source,
+      { width: 400, height: 250 },
+      [source, firstIteration],
+      40
+    );
+    // Should land below iter1, not collide with it
+    expect(result.y).toBeGreaterThanOrEqual(firstIteration.y + firstIteration.height + 40);
+    expect(result.x).toBe(0); // same column as source
+  });
+
+  it('slides down past multiple prior iterations', () => {
+    const source = makeNode({ id: 'src', x: 0, y: 0, width: 400, height: 250 });
+    const iter1 = makeNode({ id: 'i1', x: 0, y: 290, width: 400, height: 250 });
+    const iter2 = makeNode({ id: 'i2', x: 0, y: 580, width: 400, height: 250 });
+    const iter3 = makeNode({ id: 'i3', x: 0, y: 870, width: 400, height: 250 });
+    const result = computeIterationPlacement(
+      source,
+      { width: 400, height: 250 },
+      [source, iter1, iter2, iter3],
+      40
+    );
+    // Should land below iter3
+    expect(result.y).toBeGreaterThanOrEqual(iter3.y + iter3.height + 40);
+  });
+
+  it('is stable: identical inputs produce identical outputs', () => {
+    const source = makeNode({ id: 'src', x: 50, y: 60, width: 400, height: 250 });
+    const nodes = [source];
+    const size = { width: 400, height: 250 };
+    const a = computeIterationPlacement(source, size, nodes, 40);
+    const b = computeIterationPlacement(source, size, nodes, 40);
+    expect(a).toEqual(b);
+  });
+
+  it('ignores obstacles to the right of the source column (companion nodes do not block)', () => {
+    const source = makeNode({ id: 'src', x: 0, y: 0, width: 400, height: 250 });
+    // Companion lives to the right at x = 424 (gap 24 per Phase 5)
+    const companion = makeNode({
+      id: 'comp',
+      x: 424,
+      y: 0,
+      width: 400,
+      height: 250,
+    });
+    const result = computeIterationPlacement(
+      source,
+      { width: 400, height: 250 },
+      [source, companion],
+      40
+    );
+    // Placement lands in the source's column (x=0), below source
+    expect(result.x).toBe(0);
+    expect(result.y).toBe(250 + 40);
+  });
+});
+
+describe('computeEdgeAlignedPlacements anchorNode parameter', () => {
+  it('behaves identically when anchorNode is undefined (regression guard)', () => {
+    const trigger = makeNode({ id: 't', x: 100, y: 100, width: 300, height: 200 });
+    const withoutAnchor = computeEdgeAlignedPlacements(
+      trigger,
+      2,
+      [{ width: 300, height: 200 }],
+      [trigger],
+      40
+    );
+    const withUndefinedAnchor = computeEdgeAlignedPlacements(
+      trigger,
+      2,
+      [{ width: 300, height: 200 }],
+      [trigger],
+      40,
+      undefined
+    );
+    expect(withUndefinedAnchor).toEqual(withoutAnchor);
+  });
+
+  it('anchors placement math to anchorNode when provided', () => {
+    const trigger = makeNode({ id: 't', x: 0, y: 0, width: 200, height: 100 });
+    const anchor = makeNode({ id: 'a', x: 500, y: 500, width: 300, height: 200 });
+    const result = computeEdgeAlignedPlacements(
+      trigger,
+      1,
+      [{ width: 200, height: 100 }],
+      [trigger, anchor],
+      40,
+      anchor
+    );
+    // Placement should be anchored relative to the anchor, not the trigger
+    // Primary slot: right of anchor, top-aligned with anchor
+    expect(result[0].x).toBe(500 + 300 + 40); // anchor.x + anchor.width + gap
+    expect(result[0].y).toBe(500); // anchor.y
+  });
+
+  it('excludes both trigger and anchor from collision set when anchorNode is provided', () => {
+    const trigger = makeNode({ id: 't', x: 0, y: 0, width: 200, height: 100 });
+    const anchor = makeNode({ id: 'a', x: 500, y: 500, width: 300, height: 200 });
+    // Placement candidate will overlap the anchor itself if we don't exclude it
+    const result = computeEdgeAlignedPlacements(
+      trigger,
+      1,
+      [{ width: 200, height: 100 }],
+      [trigger, anchor],
+      40,
+      anchor
+    );
+    expect(result).toHaveLength(1);
+    // Should return a valid placement, not be stuck because the anchor blocked itself
+    expect(result[0]).toBeDefined();
   });
 });

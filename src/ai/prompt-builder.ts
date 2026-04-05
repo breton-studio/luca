@@ -167,3 +167,142 @@ export function buildSystemPrompt(
 export function buildUserMessage(): string {
   return 'Based on the canvas context above, generate content that extends the user\'s thinking. Follow the output format with typed <node> tags.';
 }
+
+// ---------- Iteration user message (Phase 5 gap closure) ----------
+
+import type {
+  IterationContext,
+  IterationSource,
+  IterationSourceType,
+} from '../canvas/iteration-detector';
+
+/**
+ * Build the target-node opening tag string for an iteration, e.g.
+ *   code+lang → `<node type="code" lang="typescript">`
+ *   code no lang → `<node type="code">`
+ *   text → `<node type="text">`
+ */
+function iterationTargetTag(type: IterationSourceType, lang: string | undefined): string {
+  if (type === 'code' && lang) return `<node type="code" lang="${lang}">`;
+  return `<node type="${type}">`;
+}
+
+/**
+ * Format a source's content as a fenced markdown block (for code/mermaid) or
+ * as a plain blockquote-friendly paragraph (for text/image).
+ */
+function formatSourceBlock(source: IterationSource): string {
+  if (source.type === 'code') {
+    const fenceLang = source.lang ?? '';
+    return '```' + fenceLang + '\n' + source.content + '\n```';
+  }
+  if (source.type === 'mermaid') {
+    return '```mermaid\n' + source.content + '\n```';
+  }
+  if (source.type === 'image') {
+    return `(image file: ${source.content} — original generation prompt is not persisted in V1; infer the visual concept from the user's instructions and the canvas spatial context)`;
+  }
+  // text
+  return source.content;
+}
+
+/** Human-readable label for a source's type, used in merge headers. */
+function sourceTypeLabel(type: IterationSourceType): string {
+  switch (type) {
+    case 'code':
+      return 'code';
+    case 'text':
+      return 'text';
+    case 'mermaid':
+      return 'mermaid diagram';
+    case 'image':
+      return 'image';
+  }
+}
+
+/**
+ * Build the per-call user message for an iteration request. Lives in the
+ * dynamic user message (NOT the cached system prompt block) so per-call
+ * iteration content does not bust the ephemeral cache on block 1.
+ *
+ * The returned string is sent verbatim as the user message in the Claude
+ * messages array. It references the explicit-request override language
+ * from GENERATION_INSTRUCTIONS so Claude honors the requested medium.
+ */
+export function buildIterationUserMessage(iteration: IterationContext): string {
+  const { primarySource, additionalSources, userInstructions, targetType, targetLang } =
+    iteration;
+
+  const targetTag = iterationTargetTag(targetType, targetLang);
+  const primaryTypeLabel = sourceTypeLabel(targetType);
+  const langSuffix = targetType === 'code' && targetLang ? `, lang: ${targetLang}` : '';
+
+  const lines: string[] = [];
+
+  lines.push(
+    'The user has requested an iteration on an existing AI-generated node on the canvas. This is an iteration, NOT a fresh generation. Treat the primary source below as your baseline and modify it to satisfy the user instructions.'
+  );
+  lines.push('');
+  lines.push(
+    `## Primary source — iterate on this (target output type: ${primaryTypeLabel}${langSuffix})`
+  );
+  lines.push(formatSourceBlock(primarySource));
+
+  if (additionalSources.length > 0) {
+    lines.push('');
+    lines.push(
+      '## Additional linked sources (context to synthesize with the primary)'
+    );
+    additionalSources.forEach((source, i) => {
+      const langNote = source.type === 'code' && source.lang ? `, lang: ${source.lang}` : '';
+      lines.push('');
+      lines.push(`### Source ${i + 2} (${sourceTypeLabel(source.type)}${langNote})`);
+      lines.push(formatSourceBlock(source));
+    });
+  }
+
+  lines.push('');
+  lines.push("## User's iteration instructions");
+  lines.push(userInstructions);
+  lines.push('');
+  lines.push('## Your task');
+  lines.push(
+    `Produce a SINGLE ${targetTag} node that applies the user's instructions to the primary source${
+      additionalSources.length > 0
+        ? ', synthesizing with the additional linked sources above'
+        : ''
+    }. Follow these rules strictly:`
+  );
+  lines.push('');
+  lines.push(
+    `- This is an iteration, not a fresh generation. The primary source is your baseline; do not start from scratch.`
+  );
+  lines.push(
+    `- The output type MUST be ${primaryTypeLabel}. The explicit-request override from your system instructions applies: the requested medium is ${primaryTypeLabel}, and it must be the only medium in your response. Do NOT emit additional text, code, mermaid, or image nodes beyond the single ${primaryTypeLabel} node.`
+  );
+  lines.push(
+    `- Return complete, runnable/renderable content — not a diff, not a snippet. The new node will sit ALONGSIDE the previous version on the canvas as a new iteration, not replace it.`
+  );
+
+  if (targetType === 'code') {
+    lines.push(
+      `- Use the SAME language as the primary source${
+        targetLang ? ` (${targetLang})` : ''
+      } unless the user's instructions explicitly name a different language.`
+    );
+  }
+
+  if (targetType === 'mermaid') {
+    lines.push(
+      `- Do not emit HTML tags like <br/> inside the mermaid body — use \\n or short labels.`
+    );
+  }
+
+  if (targetType === 'image') {
+    lines.push(
+      `- Write a vivid, concrete visual description for the image generator. The primary source's original Runware prompt is not available; infer the visual concept from the user's instructions and the canvas spatial context. Describe the scene, lighting, subject, framing, and style as the user would — not as pixel data.`
+    );
+  }
+
+  return lines.join('\n');
+}

@@ -150,27 +150,71 @@ export function computeCompanionPlacement(
  *  - sandbox = "allow-scripts" ONLY (never allow-same-origin -- defeats the sandbox)
  *  - srcdoc set via DOM property, NOT HTML attribute (avoids escaping pitfalls)
  *
- * NOT unit-tested: depends on a live canvas node DOM. Verified manually in Plan 06.
+ * DOM lifecycle contract (Phase 5 verification gap fix):
+ *  - Obsidian canvas text nodes only materialize the deeply-nested
+ *    `.markdown-rendered` container AFTER Obsidian's async markdown renderer
+ *    runs on non-empty text. Callers MUST seed the companion with placeholder
+ *    text via the adapter's `updateNodeText` BEFORE calling this function,
+ *    otherwise the container will not exist.
+ *  - This function polls for the rendered container with requestAnimationFrame
+ *    up to MAX_INJECT_ATTEMPTS frames to bridge Obsidian's async render pass.
+ *    If the container never materializes, injection is silently abandoned —
+ *    we do NOT fall back to creating an orphan div at the wrong DOM level
+ *    (prior behavior that produced empty-looking companions clipped by the
+ *    canvas CSS).
+ *
+ * Happy-path synchronous injection (container already present) is unit-tested.
+ * Polling behavior depends on rAF and is verified manually in the live plugin.
  */
+const MAX_INJECT_ATTEMPTS = 20; // ~320ms at 60fps — enough for Obsidian async render
+
 export function injectHtmlPreview(companionNode: any, htmlContent: string): void {
   const nodeEl = companionNode?.nodeEl;
-  if (!nodeEl) return;
+  if (!nodeEl) {
+    console.log('[Canvas AI] injectHtmlPreview: no nodeEl, aborting');
+    return;
+  }
 
-  // Find the markdown-rendered container or create one as fallback
-  const existing = nodeEl.querySelector?.('.markdown-rendered');
-  const container =
-    existing ?? (typeof nodeEl.createDiv === 'function' ? nodeEl.createDiv({ cls: 'markdown-rendered' }) : null);
-  if (!container) return;
-  if (typeof container.empty === 'function') container.empty();
-  else container.innerHTML = '';
+  let attempts = 0;
 
-  const iframe = document.createElement('iframe');
-  iframe.setAttribute('sandbox', 'allow-scripts'); // CRITICAL: never allow-same-origin
-  iframe.setAttribute('aria-label', 'Code preview');
-  // srcdoc via DOM property -- handles escaping internally (Pitfall 3)
-  iframe.srcdoc = htmlContent;
-  iframe.style.cssText =
-    'width:100%;height:100%;border:none;background:var(--background-primary);';
+  const performInject = (container: any): void => {
+    if (typeof container.empty === 'function') container.empty();
+    else container.innerHTML = '';
 
-  container.appendChild(iframe);
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('sandbox', 'allow-scripts'); // CRITICAL: never allow-same-origin
+    iframe.setAttribute('aria-label', 'Code preview');
+    // srcdoc via DOM property -- handles escaping internally (Pitfall 3)
+    iframe.srcdoc = htmlContent;
+    iframe.style.cssText =
+      'width:100%;height:100%;border:none;background:var(--background-primary);';
+
+    container.appendChild(iframe);
+    console.log(`[Canvas AI] injectHtmlPreview: iframe injected after ${attempts} attempt(s)`);
+  };
+
+  const tryInject = (): void => {
+    attempts++;
+    const container = nodeEl.querySelector?.('.markdown-rendered');
+    if (container) {
+      performInject(container);
+      return;
+    }
+    if (attempts >= MAX_INJECT_ATTEMPTS) {
+      console.log(
+        `[Canvas AI] injectHtmlPreview: .markdown-rendered never materialized after ${attempts} attempts; giving up`
+      );
+      return;
+    }
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(tryInject);
+    } else {
+      // Test/Node environment without rAF: bail out after first sync attempt.
+      // The happy-path tests pre-seed the container so tryInject finds it
+      // synchronously on attempt 1.
+      return;
+    }
+  };
+
+  tryInject();
 }

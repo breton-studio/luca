@@ -663,8 +663,16 @@ export default class CanvasAIPlugin extends Plugin {
       if (contentType === 'html') {
         const htmlContent = createHtmlCompanionContent(codeContent, lang);
         if (htmlContent) {
+          // Seed placeholder text so Obsidian's async markdown renderer
+          // materializes the nested `.markdown-rendered` container inside
+          // nodeEl. injectHtmlPreview will poll via rAF for that container
+          // and then inject the iframe at the correct DOM level. Without
+          // seeding, the container never exists and the iframe ends up
+          // clipped by the canvas CSS (Phase 5 verification gap fix).
+          this.suppressEvents(() => this.adapter.updateNodeText(companionNode, '\u00a0'));
           // Inject live iframe into DOM (Phase 5 session only -- reloads show raw source
           // until a post-processor re-injects on canvas reload in a future phase)
+          console.log(`[Canvas AI] HTML companion: seeding + injecting, content length=${htmlContent.length}`);
           injectHtmlPreview(companionNode, htmlContent);
         }
       } else if (contentType === 'mermaid') {

@@ -5,6 +5,7 @@ import {
   buildSvgCompanionContent,
   computeCompanionPlacement,
   COMPANION_GAP,
+  injectHtmlPreview,
 } from '../../src/canvas/companion-node';
 
 describe('detectCompanionContentType (D-12, D-13)', () => {
@@ -124,5 +125,129 @@ describe('computeCompanionPlacement', () => {
   });
   test('COMPANION_GAP is 24 per UI-SPEC', () => {
     expect(COMPANION_GAP).toBe(24);
+  });
+});
+
+// ─── injectHtmlPreview DOM injection (D-13, D-14) ─────────────────────
+//
+// The test environment is `node`, so we hand-roll the minimum DOM surface
+// injectHtmlPreview touches: querySelector, appendChild, empty(), setAttribute,
+// and a stand-in `document` with createElement that returns a mock iframe.
+//
+// Regression coverage for Phase 5 verification: the bug was that when the
+// companion node had empty text, `.markdown-rendered` did not exist inside
+// nodeEl, so the old fallback created an orphan div at the top of nodeEl and
+// the iframe was clipped by Obsidian's canvas CSS. The fix requires the
+// caller to seed the node with placeholder text first so Obsidian's markdown
+// renderer materializes `.markdown-rendered` before injection.
+
+type MockIframe = {
+  tag: string;
+  attributes: Record<string, string>;
+  srcdoc: string;
+  style: { cssText: string };
+};
+
+function makeMockEnv() {
+  const appended: MockIframe[] = [];
+
+  const container = {
+    children: [] as MockIframe[],
+    empty: jest.fn(function (this: any) {
+      this.children = [];
+    }),
+    appendChild: jest.fn(function (this: any, child: MockIframe) {
+      this.children.push(child);
+      appended.push(child);
+    }),
+  };
+
+  const nodeEl = {
+    querySelector: jest.fn((sel: string) =>
+      sel === '.markdown-rendered' ? container : null
+    ),
+  };
+
+  const companionNode = { nodeEl };
+
+  const originalDocument = (global as any).document;
+  (global as any).document = {
+    createElement: jest.fn((tag: string) => {
+      const iframe: MockIframe = {
+        tag,
+        attributes: {},
+        srcdoc: '',
+        style: { cssText: '' },
+      };
+      (iframe as any).setAttribute = (k: string, v: string) => {
+        iframe.attributes[k] = v;
+      };
+      return iframe;
+    }),
+  };
+
+  const restoreDocument = () => {
+    (global as any).document = originalDocument;
+  };
+
+  return { companionNode, container, nodeEl, appended, restoreDocument };
+}
+
+describe('injectHtmlPreview (D-13, D-14 — security + DOM)', () => {
+  test('appends an iframe with sandbox="allow-scripts" when .markdown-rendered exists', () => {
+    const env = makeMockEnv();
+    injectHtmlPreview(env.companionNode, '<html><body>hi</body></html>');
+    // injection is deferred via rAF in the real flow but is synchronous on the
+    // first attempt if the container is already present — no rAF needed here.
+    expect(env.appended.length).toBe(1);
+    const iframe = env.appended[0];
+    expect(iframe.tag).toBe('iframe');
+    expect(iframe.attributes.sandbox).toBe('allow-scripts');
+    expect(iframe.attributes.sandbox).not.toContain('allow-same-origin');
+    expect(iframe.srcdoc).toBe('<html><body>hi</body></html>');
+    env.restoreDocument();
+  });
+
+  test('empties the container before appending to avoid stacking iframes', () => {
+    const env = makeMockEnv();
+    injectHtmlPreview(env.companionNode, '<html></html>');
+    expect(env.container.empty).toHaveBeenCalled();
+    env.restoreDocument();
+  });
+
+  test('aborts silently when companionNode.nodeEl is missing', () => {
+    const env = makeMockEnv();
+    const noNodeEl = { nodeEl: undefined };
+    expect(() => injectHtmlPreview(noNodeEl, '<html></html>')).not.toThrow();
+    expect(env.appended.length).toBe(0);
+    env.restoreDocument();
+  });
+
+  test('does NOT create an orphan .markdown-rendered div when container is missing (regression)', () => {
+    // Repro of the Phase 5 verification bug: when companion has empty text,
+    // Obsidian has not rendered `.markdown-rendered` yet. The old fallback
+    // created an orphan via nodeEl.createDiv(), which lived at the wrong DOM
+    // level and was clipped. Correct behavior: abort injection (the caller is
+    // expected to seed placeholder text + defer). The retry path is exercised
+    // in the real flow via rAF polling and is not asserted here.
+    const appended: MockIframe[] = [];
+    const orphanCreateDiv = jest.fn();
+    const companionNode = {
+      nodeEl: {
+        querySelector: jest.fn(() => null),
+        createDiv: orphanCreateDiv,
+      },
+    };
+    const originalDocument = (global as any).document;
+    (global as any).document = {
+      createElement: jest.fn(() => ({
+        setAttribute: () => {},
+        style: { cssText: '' },
+      })),
+    };
+    injectHtmlPreview(companionNode, '<html></html>');
+    expect(orphanCreateDiv).not.toHaveBeenCalled();
+    expect(appended.length).toBe(0);
+    (global as any).document = originalDocument;
   });
 });

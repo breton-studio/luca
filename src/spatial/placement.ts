@@ -1,21 +1,27 @@
 /**
- * Collision-free orbital placement with directional scanning.
+ * Edge-aligned placement with slide-down + clockwise fallback.
  *
- * Computes where to place generated nodes around the trigger node (D-09)
- * without overlapping existing nodes, maintaining comfortable gaps (D-11),
- * fanning multiple nodes into the direction with most open space (D-10),
- * and scanning outward when space is blocked (D-12).
+ * Computes where to place generated nodes relative to the trigger node.
+ * Per D-09: nodes flow rightward from the trigger node's right edge, top-aligned.
+ * Per D-10: multiple nodes stack vertically along the same x-coordinate with a
+ * consistent gap between them.
+ * Per D-11: gap of 40px is enforced between all nodes via expanded bounding
+ * box collision checking.
+ * Per Pitfall 6: when the right column is blocked, SLIDE DOWN within the right
+ * column before falling back to another direction.
+ * Clockwise fallback order (D-11 + UI-SPEC): Right -> slide down -> Below -> Left -> Above.
+ *
+ * Legacy primitives `checkCollision` and `findOpenDirection` are preserved;
+ * they are still consumed by this module and by tests.
  *
  * All coordinates are in canvas space, not viewport space (Pitfall 7).
- * Maximum search radius is bounded to prevent infinite loops (Pitfall 3).
- *
  * Pure math -- no Obsidian imports.
  */
 
 import type { CanvasNodeInfo } from '../types/canvas';
 import type { Point } from './types';
 import { DEFAULT_SPATIAL_CONFIG } from './types';
-import { computeCenter, euclideanDistance } from './proximity';
+import { computeCenter } from './proximity';
 
 /**
  * Axis-aligned bounding box.
@@ -81,6 +87,10 @@ export function checkCollision(
 /**
  * Find the direction (angle in radians) with the most open space around a center point.
  *
+ * Preserved from the prior orbital algorithm. No longer consumed by placement
+ * directly, but retained because tests cover it and other future strategies
+ * may want to reuse it.
+ *
  * Per D-10: divide space into 8 sectors (45 degrees each).
  * For each sector, count how many existing node centers fall within a 90-degree
  * arc of that direction. Return the angle of the sector with the fewest nodes.
@@ -142,129 +152,171 @@ export function findOpenDirection(
 }
 
 /**
- * Compute collision-free orbital placements around a trigger node.
+ * Compute edge-aligned placements for generated nodes (D-09, D-10, D-11, Pitfall 6).
  *
- * Per D-09: generated nodes orbit the most recently edited node.
- * Per D-10: multiple nodes fan out in the direction with most open space.
- * Per D-11: gap of 40px maintained between all nodes.
- * Per D-12: if space is blocked, scan outward by gap increments.
- * Per Pitfall 3: max search radius = starting * maxSearchRadius (default 5).
- * Per Pitfall 7: all coordinates in canvas space.
+ * Strategy:
+ *  1. First candidate: x = trigger.x + trigger.width + gap, y = trigger.y
+ *     (top-aligned per D-09).
+ *  2. Subsequent candidates: same x, y stacked below previous placement + gap (D-10).
+ *  3. If collision at candidate: slide candidate y DOWNWARD within the right
+ *     column (x unchanged) in increments of gap until a free slot is found OR
+ *     we exceed the slide-down search ceiling (Pitfall 6).
+ *  4. If the right column is entirely blocked, try BELOW the trigger:
+ *     x = trigger.x, y = trigger.y + trigger.height + gap.
+ *  5. If Below blocked, try LEFT: x = trigger.x - nodeSize.width - gap, y = trigger.y.
+ *  6. If Left blocked, try ABOVE: x = trigger.x, y = trigger.y - nodeSize.height - gap.
+ *  7. If all four directions blocked, return a fallback placement far right
+ *     (x = trigger.x + trigger.width + gap + triggerNode.width, y = trigger.y)
+ *     to guarantee `count` placements are always returned.
  *
- * @param triggerNode - The most recently edited node (orbit center)
+ * Accepts a `nodeSizes` array so heterogeneous node types (text, code, mermaid,
+ * image) can each use their correct dimensions. If `nodeSizes` is shorter than
+ * `count`, the last size is reused; if empty, a default 300x200 is used.
+ *
+ * The trigger node is automatically excluded from the collision set (matches
+ * prior orbital behavior — generated nodes are allowed to sit within the
+ * trigger's gap ring because they are intentionally placed there).
+ *
+ * @param triggerNode - The node to align against
  * @param count - Number of placements to compute
- * @param nodeSize - Dimensions of the nodes being placed
- * @param existingNodes - All existing canvas nodes
- * @param gap - Gap in pixels between nodes (default from config)
+ * @param nodeSizes - Per-node dimensions (length may differ from count)
+ * @param existingNodes - All existing canvas nodes (trigger filtered out automatically)
+ * @param gap - Gap in pixels (default from DEFAULT_SPATIAL_CONFIG.placementGap)
  * @returns Array of exactly `count` PlacementCoordinate items
  */
-export function computeOrbitalPlacements(
+export function computeEdgeAlignedPlacements(
   triggerNode: CanvasNodeInfo,
   count: number,
-  nodeSize: { width: number; height: number },
+  nodeSizes: Array<{ width: number; height: number }>,
   existingNodes: CanvasNodeInfo[],
   gap: number = DEFAULT_SPATIAL_CONFIG.placementGap
 ): PlacementCoordinate[] {
-  const triggerCenter = computeCenter(triggerNode);
+  if (count <= 0) return [];
 
-  // Starting radius: distance from trigger center to edge + gap + half node width
-  const startingRadius =
-    Math.max(triggerNode.width, triggerNode.height) / 2 +
-    gap +
-    Math.max(nodeSize.width, nodeSize.height) / 2;
-
-  // Max search radius bounded per Pitfall 3
-  const maxRadius = startingRadius * DEFAULT_SPATIAL_CONFIG.maxSearchRadius;
-
-  // Find the best direction to place nodes
-  // Exclude the trigger node itself from direction finding
-  const otherNodes = existingNodes.filter((n) => n.id !== triggerNode.id);
-  const bestAngle = findOpenDirection(triggerCenter, otherNodes);
-
-  // Build existing bounding boxes (exclude trigger from collision checking)
-  const existingBoxes: BoundingBox[] = otherNodes.map((n) => ({
-    x: n.x,
-    y: n.y,
-    width: n.width,
-    height: n.height,
-  }));
-
-  // Spread count nodes across a 60-degree arc centered on the best angle
-  const arcSpread = Math.PI / 3; // 60 degrees
   const placements: PlacementCoordinate[] = [];
+  const fallbackSize = { width: 300, height: 200 };
+
+  // Exclude trigger from collision set (per legacy orbital pattern)
+  const existingBoxes: BoundingBox[] = existingNodes
+    .filter((n) => n.id !== triggerNode.id)
+    .map((n) => ({ x: n.x, y: n.y, width: n.width, height: n.height }));
+
+  const resolveSize = (i: number) =>
+    nodeSizes[i] ?? nodeSizes[nodeSizes.length - 1] ?? fallbackSize;
 
   for (let i = 0; i < count; i++) {
-    // Compute the angle for this placement within the arc
-    let placementAngle: number;
-    if (count === 1) {
-      placementAngle = bestAngle;
-    } else {
-      // Spread evenly across the arc
-      const step = arcSpread / (count - 1);
-      placementAngle = bestAngle - arcSpread / 2 + step * i;
-    }
+    const size = resolveSize(i);
 
-    // Try placing at increasing radii until no collision
-    let placed = false;
-    let radius = startingRadius;
+    // All boxes to check collision against: existing + already-placed peers
+    const allBoxes: BoundingBox[] = [
+      ...existingBoxes,
+      ...placements.map((p) => ({
+        x: p.x,
+        y: p.y,
+        width: p.width,
+        height: p.height,
+      })),
+    ];
 
-    while (radius <= maxRadius) {
-      const candidateX =
-        triggerCenter.x + Math.cos(placementAngle) * radius - nodeSize.width / 2;
-      const candidateY =
-        triggerCenter.y + Math.sin(placementAngle) * radius - nodeSize.height / 2;
-
-      const candidate: BoundingBox = {
-        x: candidateX,
-        y: candidateY,
-        width: nodeSize.width,
-        height: nodeSize.height,
-      };
-
-      // Also check against already-placed nodes
-      const allBoxes = [
-        ...existingBoxes,
-        ...placements.map((p) => ({
-          x: p.x,
-          y: p.y,
-          width: p.width,
-          height: p.height,
-        })),
-      ];
-
-      if (!checkCollision(candidate, allBoxes, gap)) {
-        placements.push({
-          x: candidateX,
-          y: candidateY,
-          width: nodeSize.width,
-          height: nodeSize.height,
-        });
-        placed = true;
-        break;
-      }
-
-      // Step outward by gap increment
-      radius += gap;
-    }
-
-    // Fallback: place at max radius in this direction (D-12 fallback)
-    if (!placed) {
-      const fallbackX =
-        triggerCenter.x +
-        Math.cos(placementAngle) * maxRadius -
-        nodeSize.width / 2;
-      const fallbackY =
-        triggerCenter.y +
-        Math.sin(placementAngle) * maxRadius -
-        nodeSize.height / 2;
-      placements.push({
-        x: fallbackX,
-        y: fallbackY,
-        width: nodeSize.width,
-        height: nodeSize.height,
-      });
-    }
+    const placement = findEdgeAlignedSlot(triggerNode, size, allBoxes, gap, placements);
+    placements.push(placement);
   }
 
   return placements;
+}
+
+/**
+ * Find an edge-aligned slot for a single placement.
+ * Tries: Right (stack below previous peer) -> slide down -> Below -> Left -> Above -> fallback.
+ */
+function findEdgeAlignedSlot(
+  triggerNode: CanvasNodeInfo,
+  size: { width: number; height: number },
+  obstacles: BoundingBox[],
+  gap: number,
+  priorPlacements: PlacementCoordinate[]
+): PlacementCoordinate {
+  // Start y: if there are prior placements, stack below the last one; else top-align with trigger
+  const rightX = triggerNode.x + triggerNode.width + gap;
+  const lastPeer = priorPlacements[priorPlacements.length - 1];
+  const stackStartY = lastPeer ? lastPeer.y + lastPeer.height + gap : triggerNode.y;
+
+  // 1. Try stacked position in the right column
+  const primary: BoundingBox = {
+    x: rightX,
+    y: stackStartY,
+    width: size.width,
+    height: size.height,
+  };
+  if (!checkCollision(primary, obstacles, gap)) {
+    return { ...primary };
+  }
+
+  // 2. Slide DOWN within the right column (Pitfall 6)
+  const slideCeiling =
+    triggerNode.y + Math.max(triggerNode.height * 10, 2000);
+  let slideY = stackStartY + gap;
+  while (slideY <= slideCeiling) {
+    const slid: BoundingBox = {
+      x: rightX,
+      y: slideY,
+      width: size.width,
+      height: size.height,
+    };
+    if (!checkCollision(slid, obstacles, gap)) {
+      return { ...slid };
+    }
+    slideY += gap;
+  }
+
+  // When falling through to Below/Left/Above, exclude obstacles that live
+  // entirely in the right column (x >= trigger.x + trigger.width + gap).
+  // Those were already exhausted by slide-down, and re-counting them here
+  // would spuriously block fallbacks whose candidate boxes merely clip the
+  // right column due to wide node sizes.
+  const rightColumnStart = triggerNode.x + triggerNode.width + gap;
+  const fallbackObstacles = obstacles.filter(
+    (b) => b.x < rightColumnStart
+  );
+
+  // 3. Fall back: BELOW trigger
+  const belowCandidate: BoundingBox = {
+    x: triggerNode.x,
+    y: triggerNode.y + triggerNode.height + gap,
+    width: size.width,
+    height: size.height,
+  };
+  if (!checkCollision(belowCandidate, fallbackObstacles, gap)) {
+    return { ...belowCandidate };
+  }
+
+  // 4. Fall back: LEFT of trigger
+  const leftCandidate: BoundingBox = {
+    x: triggerNode.x - size.width - gap,
+    y: triggerNode.y,
+    width: size.width,
+    height: size.height,
+  };
+  if (!checkCollision(leftCandidate, fallbackObstacles, gap)) {
+    return { ...leftCandidate };
+  }
+
+  // 5. Fall back: ABOVE trigger
+  const aboveCandidate: BoundingBox = {
+    x: triggerNode.x,
+    y: triggerNode.y - size.height - gap,
+    width: size.width,
+    height: size.height,
+  };
+  if (!checkCollision(aboveCandidate, fallbackObstacles, gap)) {
+    return { ...aboveCandidate };
+  }
+
+  // 6. Last-resort fallback — place far right even if it overlaps; guarantee count is returned
+  return {
+    x: rightX + triggerNode.width,
+    y: triggerNode.y,
+    width: size.width,
+    height: size.height,
+  };
 }

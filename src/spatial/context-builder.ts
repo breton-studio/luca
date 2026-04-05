@@ -20,7 +20,7 @@ import { DEFAULT_SPATIAL_CONFIG } from './types';
 import { buildProximityGraph, computeCenter } from './proximity';
 import { dbscan, computeAdaptiveEpsilon, findFocusCluster } from './clustering';
 import type { ClusterInfo, ClusterResult } from './clustering';
-import { computeOrbitalPlacements } from './placement';
+import { computeEdgeAlignedPlacements } from './placement';
 import type { PlacementCoordinate } from './placement';
 
 /**
@@ -344,11 +344,27 @@ export function buildSpatialContext(
       directionFromTrigger: describeDirection(triggerNode!, node),
     }));
 
-  // Step 8: Compute placement suggestions
-  const placementSuggestions = computeOrbitalPlacements(
+  // Step 8: Compute placement suggestions (D-09, D-10, D-11, Pitfall 6).
+  // Edge-aligned placement with default sizing for up to 4 node types
+  // (text + code + mermaid + image per Phase 4 D-03).
+  //
+  // Trade-off: placements are pre-computed with a standard type order
+  // (text/code/mermaid/image), but Claude may emit types in a different order.
+  // Size mismatch is bounded by Math.max(sizes) vs Math.min(sizes) = 212px,
+  // which is within the slide-down search ceiling. The streaming pipeline
+  // (main.ts streamWithRetry) overrides width/height to match the actual
+  // emitted type when creating the node, so visual collisions are rare but
+  // theoretically possible in edge cases.
+  const defaultSizesForContext: Array<{ width: number; height: number }> = [
+    { width: 300, height: 200 }, // text
+    { width: 400, height: 250 }, // code
+    { width: 400, height: 300 }, // mermaid
+    { width: 512, height: 512 }, // image
+  ];
+  const placementSuggestions = computeEdgeAlignedPlacements(
     triggerNode,
-    3,
-    { width: 300, height: 200 },
+    4,
+    defaultSizesForContext,
     nodes,
     mergedConfig.placementGap
   );

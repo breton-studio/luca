@@ -230,10 +230,12 @@ describe('buildSpatialContext', () => {
     expect(result.narrative).toContain('Peripheral');
   });
 
-  test('with clusteredCanvas: placementSuggestions has 3 items', () => {
+  test('with clusteredCanvas: placementSuggestions has 4 items (one per node type)', () => {
     const nodes = clusteredCanvas();
     const result = buildSpatialContext(nodes, [], 'c1a');
-    expect(result.placementSuggestions).toHaveLength(3);
+    // Phase 5 Plan 04 bumps count from 3 -> 4 to support Phase 4's four node
+    // types (text, code, mermaid, image) via computeEdgeAlignedPlacements.
+    expect(result.placementSuggestions).toHaveLength(4);
   });
 
   test('with clusteredCanvas: relevantNodes sorted by relevance descending', () => {

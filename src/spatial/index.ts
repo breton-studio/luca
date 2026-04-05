@@ -23,5 +23,5 @@ export { DEFAULT_SPATIAL_CONFIG } from './types';
 // Individual functions (for advanced use or testing)
 export { computeCenter, euclideanDistance, computeRelevance, buildProximityGraph } from './proximity';
 export { dbscan, computeAdaptiveEpsilon, findFocusCluster } from './clustering';
-export { checkCollision, findOpenDirection, computeOrbitalPlacements } from './placement';
+export { checkCollision, findOpenDirection, computeEdgeAlignedPlacements } from './placement';
 export { serializeNarrative, filterRelevantNodes, describeDirection } from './context-builder';

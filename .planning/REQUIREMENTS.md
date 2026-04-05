@@ -68,7 +68,7 @@
 - [x] **TAST-02**: Taste profile includes fields: thinking style, tone, visual preference, depth
 - [x] **TAST-03**: Taste profile injected into system prompt for every Claude API call
 - [ ] **TAST-04**: Per-team-member profiles supported (each user has their own file)
-- [ ] **TAST-05**: Taste profile editable through settings UI or by editing the file directly
+- [x] **TAST-05**: Taste profile editable through settings UI or by editing the file directly
 - [ ] **TAST-06**: Structured separation of style (how to communicate) vs substance (what to communicate)
 - [ ] **TAST-07**: Counter-sycophancy instructions in system prompt prevent taste profile from suppressing novelty
 
@@ -159,7 +159,7 @@
 | TAST-02 | Phase 3 | Complete |
 | TAST-03 | Phase 3 | Complete |
 | TAST-04 | Phase 5 | Pending |
-| TAST-05 | Phase 5 | Pending |
+| TAST-05 | Phase 5 | Complete |
 | TAST-06 | Phase 5 | Pending |
 | TAST-07 | Phase 5 | Pending |
 

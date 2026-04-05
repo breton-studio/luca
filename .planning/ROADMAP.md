@@ -102,7 +102,7 @@ Plans:
 Plans:
 - [ ] 05-01-PLAN.md -- Taste profile nested style/substance structure with legacy migration
 - [ ] 05-02-PLAN.md -- Counter-sycophancy instructions in system prompt
-- [ ] 05-03-PLAN.md -- Settings UI reset confirmation modal
+- [x] 05-03-PLAN.md -- Settings UI reset confirmation modal
 - [ ] 05-04-PLAN.md -- Edge-aligned placement replacing orbital
 - [ ] 05-05-PLAN.md -- Companion render nodes for HTML/Mermaid/SVG code
 - [ ] 05-06-PLAN.md -- Build verification and manual testing in live Obsidian

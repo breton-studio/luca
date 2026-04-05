@@ -141,6 +141,22 @@ export default class CanvasAIPlugin extends Plugin {
     // Canvas event patching (FOUN-04, FOUN-05, FOUN-06, FOUN-07)
     initCanvasPatching(this);
 
+    // Rehydrate companion iframes on plugin load for canvases that are
+    // ALREADY active/visible. onActiveLeafChange only fires on FUTURE
+    // leaf changes, so toggling the plugin off/on with a canvas open
+    // would otherwise silently skip rehydration. onLayoutReady defers
+    // until Obsidian's workspace layout is stable.
+    this.app.workspace.onLayoutReady(() => {
+      this.app.workspace.iterateAllLeaves((leaf) => {
+        if (leaf.view?.getViewType() === 'canvas') {
+          const canvas = (leaf.view as any).canvas;
+          if (canvas) {
+            requestAnimationFrame(() => this.rehydrateCompanionNodes(canvas));
+          }
+        }
+      });
+    });
+
     // Debounce controller (FOUN-08, FOUN-09) -- wired to real generation pipeline
     this.generationController = new GenerationController(
       this.settings.debounceDelay,
@@ -942,6 +958,14 @@ export default class CanvasAIPlugin extends Plugin {
    * nodes still block generation-on-click and participate in the iteration
    * feature.
    *
+   * Self-healing for pre-fix companions: if a companion has `companionOf`
+   * but no `companionHtml` marker (because it was created before the
+   * rehydration fix landed), the function reconstructs the HTML content
+   * from the still-present source code node via the existing companion
+   * helpers. The reconstructed HTML is then persisted back to the
+   * companion's unknownData so subsequent reloads skip the reconstruction
+   * step.
+   *
    * Idempotent: safe to call multiple times on the same canvas (e.g. when
    * the user switches tabs and comes back). injectHtmlPreview empties the
    * container before appending, so re-injection replaces rather than stacks.
@@ -951,6 +975,7 @@ export default class CanvasAIPlugin extends Plugin {
 
     const allNodes: any[] = Array.from(canvas.nodes.values());
     let rehydratedHtml = 0;
+    let selfHealed = 0;
     let rehydratedAiMarkers = 0;
 
     for (const node of allNodes) {
@@ -973,15 +998,51 @@ export default class CanvasAIPlugin extends Plugin {
         }
       }
 
-      // HTML iframe re-injection: only for companions that stored their
-      // HTML content in unknownData.companionHtml at creation time.
-      if (
-        unknownData.companionContentType === 'html' &&
+      // HTML iframe re-injection path.
+      // Case 1: companion was created post-fix with companionHtml persisted.
+      // Case 2: pre-fix companion with only companionOf — reconstruct from
+      //         the source code node and persist for next time.
+      const hasStoredHtml =
         typeof unknownData.companionHtml === 'string' &&
-        unknownData.companionHtml.length > 0
-      ) {
+        unknownData.companionHtml.length > 0;
+      const isHtmlCompanion =
+        unknownData.companionContentType === 'html' ||
+        (unknownData.companionOf && !unknownData.companionContentType); // pre-fix: try
+
+      if (!isHtmlCompanion && !hasStoredHtml) continue;
+
+      let htmlToInject: string | null = null;
+
+      if (hasStoredHtml) {
+        htmlToInject = unknownData.companionHtml;
+      } else if (unknownData.companionOf) {
+        // Self-heal: reconstruct HTML from the source code node
+        const sourceNode = canvas.nodes.get?.(unknownData.companionOf);
+        if (sourceNode) {
+          const sourceText = this.readNodeText(sourceNode);
+          const fenceMatch = sourceText.match(
+            /^```([\w+-]+)?\s*\n([\s\S]*?)\n```\s*$/
+          );
+          if (fenceMatch) {
+            const lang = fenceMatch[1] || undefined;
+            const body = fenceMatch[2] ?? '';
+            const contentType = detectCompanionContentType(body, lang);
+            if (contentType === 'html') {
+              htmlToInject = createHtmlCompanionContent(body, lang);
+              if (htmlToInject) {
+                // Persist for future reloads (self-healing)
+                unknownData.companionHtml = htmlToInject;
+                unknownData.companionContentType = 'html';
+                selfHealed++;
+              }
+            }
+          }
+        }
+      }
+
+      if (htmlToInject) {
         try {
-          injectHtmlPreview(node, unknownData.companionHtml);
+          injectHtmlPreview(node, htmlToInject);
           rehydratedHtml++;
         } catch (err) {
           console.error('[Canvas AI] Companion rehydration failed for node', node.id, err);
@@ -989,11 +1050,29 @@ export default class CanvasAIPlugin extends Plugin {
       }
     }
 
-    if (rehydratedHtml > 0 || rehydratedAiMarkers > 0) {
+    if (selfHealed > 0) {
+      // Persist the newly-added companionHtml markers via canvas save.
+      this.suppressEvents(() => this.adapter.requestCanvasSave(canvas));
+    }
+
+    if (rehydratedHtml > 0 || rehydratedAiMarkers > 0 || selfHealed > 0) {
       console.log(
-        `[Canvas AI] canvas rehydrated: ${rehydratedHtml} HTML companion(s), ` +
+        `[Canvas AI] canvas rehydrated: ${rehydratedHtml} HTML companion(s) ` +
+          `(${selfHealed} self-healed from pre-fix state), ` +
           `${rehydratedAiMarkers} aiNodeIds marker(s)`
       );
     }
+  }
+
+  /**
+   * Best-effort read of a canvas text node's text content. Canvas internal
+   * nodes expose text via different properties depending on state:
+   *   - node.text (canonical, set via setText)
+   *   - node.unknownData.text (serialized form after reload)
+   */
+  private readNodeText(node: any): string {
+    if (typeof node?.text === 'string') return node.text;
+    if (typeof node?.unknownData?.text === 'string') return node.unknownData.text;
+    return '';
   }
 }
